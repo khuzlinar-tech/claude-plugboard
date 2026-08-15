@@ -274,11 +274,16 @@ async function apiUsageFor(profile, force) {
 
 /* -------------------------------------------------------------- status line */
 
-/** Unicode by default; the ASCII set exists for terminals with a legacy font. */
+/**
+ * Unicode by default; the ASCII set exists for terminals with a legacy font.
+ * No branch symbol in either set: the obvious candidates (U+2387, Powerline)
+ * are missing from the fonts terminals actually ship with, and a replacement
+ * box next to the branch name is worse than no symbol at all.
+ */
 function statuslineGlyphs() {
   return config.get('statuslineAscii')
     ? { sep: ' | ', full: '#', empty: '.', mark: '|', branch: '' }
-    : { sep: ' │ ', full: '█', empty: '░', mark: '┃', branch: '⎇' };
+    : { sep: ' │ ', full: '█', empty: '░', mark: '┃', branch: '' };
 }
 
 /** Whether the interface language formats time on a 12-hour clock. */

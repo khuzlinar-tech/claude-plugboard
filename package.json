@@ -1,7 +1,7 @@
 {
-  "name": "claude-profile-manager",
-  "productName": "Claude Profile Manager",
-  "version": "1.6.0",
+  "name": "claude-plugboard",
+  "productName": "Claude Plugboard",
+  "version": "1.6.1",
   "description": "Switch between multiple Claude accounts on Windows and see the plan, subscription and rate-limit usage of each one.",
   "keywords": [
     "claude",
@@ -22,13 +22,13 @@
     "desktop-app",
     "tray-app"
   ],
-  "homepage": "https://github.com/khuzlinar-tech/claude-profile-manager",
+  "homepage": "https://github.com/khuzlinar-tech/claude-plugboard",
   "repository": {
     "type": "git",
-    "url": "https://github.com/khuzlinar-tech/claude-profile-manager.git"
+    "url": "https://github.com/khuzlinar-tech/claude-plugboard.git"
   },
   "bugs": {
-    "url": "https://github.com/khuzlinar-tech/claude-profile-manager/issues"
+    "url": "https://github.com/khuzlinar-tech/claude-plugboard/issues"
   },
   "license": "MIT",
   "main": "src/main.js",
@@ -47,8 +47,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "io.github.claude-profile-manager",
-    "productName": "Claude Profile Manager",
+    "appId": "io.github.claude-plugboard",
+    "productName": "Claude Plugboard",
     "directories": {
       "output": "dist",
       "buildResources": "assets"
@@ -73,7 +73,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Claude Profile Manager",
+      "shortcutName": "Claude Plugboard",
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "portable": {

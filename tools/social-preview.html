@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  The repository's social preview card, rendered at 1280×640 by
+  tools/make-social.js. Kept as HTML because that is the one drawing tool this
+  project already has: a window, a stylesheet and capturePage.
+
+  It has to survive being shrunk to a thumbnail in a Reddit or Discord card, so
+  the name is large, the sentence is one line, and everything else is texture.
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1280px;
+    height: 640px;
+    overflow: hidden;
+  }
+
+  body {
+    background: #1b1a19;
+    color: #f0eee6;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 64px 72px 56px;
+    position: relative;
+  }
+
+  /* A soft glow behind the mark, so the card is not a flat rectangle. */
+  .glow {
+    position: absolute;
+    right: -180px;
+    top: -220px;
+    width: 720px;
+    height: 720px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(217, 119, 87, .22) 0%, rgba(217, 119, 87, 0) 68%);
+  }
+
+  .top { display: flex; align-items: center; gap: 22px; }
+  .logo { width: 76px; height: 76px; }
+
+  h1 {
+    font-size: 68px;
+    font-weight: 680;
+    letter-spacing: -.025em;
+    line-height: 1;
+  }
+
+  .lead {
+    margin-top: 26px;
+    font-size: 29px;
+    line-height: 1.42;
+    color: #cfc9c0;
+    max-width: 1000px;
+    font-weight: 380;
+  }
+
+  .lead b { color: #f0eee6; font-weight: 600; }
+
+  .chips { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+
+  .chip {
+    font-size: 19px;
+    padding: 9px 17px;
+    border: 1px solid #3a3735;
+    border-radius: 999px;
+    color: #cfc9c0;
+    background: #232120;
+  }
+
+  .chip i { font-style: normal; color: #d97757; margin-right: 8px; }
+
+  /* The status line, drawn the way the terminal draws it. */
+  .term {
+    margin-top: 8px;
+    background: #141312;
+    border: 1px solid #322f2d;
+    border-radius: 12px;
+    padding: 18px 22px;
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 22px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .dim { color: #8b857d; }
+  .accent { color: #7fb0d8; }
+  .ok { color: #7fc08a; }
+  .sep { color: #4d4945; }
+
+  .foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 21px;
+    color: #8b857d;
+  }
+
+  .foot .url { color: #cfc9c0; }
+  .foot .meta { text-align: right; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+
+  <div>
+    <div class="top">
+      <svg class="logo" viewBox="0 0 24 24">
+        <rect x="3.5" y="3.5" width="12" height="12" rx="3" fill="#7484a0"/>
+        <rect x="7" y="7" width="13.5" height="13.5" rx="3.4" fill="#1b1a19"/>
+        <rect x="8.5" y="8.5" width="12" height="12" rx="3" fill="#e4a062"/>
+      </svg>
+      <h1>Claude Plugboard</h1>
+    </div>
+
+    <p class="lead">
+      Switch between multiple <b>Claude</b> accounts on Windows — and see the plan,
+      the limits and <b>how much of each one is left</b>.
+    </p>
+
+    <div class="chips">
+      <span class="chip"><i>◆</i>Profile switching</span>
+      <span class="chip"><i>◆</i>5-hour &amp; weekly usage</span>
+      <span class="chip"><i>◆</i>Tray meters</span>
+      <span class="chip"><i>◆</i>Claude Code status line</span>
+      <span class="chip"><i>◆</i>8 languages</span>
+    </div>
+  </div>
+
+  <div class="term">
+    <span class="accent">web-app</span><span class="sep"> │ </span><span class="dim">main</span><span class="sep"> │ </span><span class="dim">Opus</span><span class="sep"> │ </span><span class="accent">work</span><span class="sep"> │ </span>Usage: <span class="ok">24%</span> <span class="ok">██░░░░░┃░░</span><span class="sep"> │ </span>Reset: <span class="dim">8:56 PM (1h 06m)</span>
+  </div>
+
+  <div class="foot">
+    <span class="url">github.com/khuzlinar-tech/claude-plugboard</span>
+    <span class="meta">MIT · Windows 10/11 · no telemetry<br>Unofficial — not affiliated with Anthropic</span>
+  </div>
+</body>
+</html>

@@ -1,4 +1,4 @@
-# Claude Profile Manager
+# Claude Plugboard
 
 **Switch between multiple Claude accounts on Windows, and see the plan, subscription and
 rate-limit usage of each one — without signing in and out by hand.**
@@ -92,9 +92,9 @@ Three ways to get exact reset times:
 
 Download from [Releases](../../releases):
 
-- **`Claude Profile Manager-Setup-<version>.exe`** — installer, adds Start menu and desktop
+- **`Claude Plugboard-Setup-<version>.exe`** — installer, adds Start menu and desktop
   shortcuts.
-- **`Claude Profile Manager-<version>-portable.exe`** — single file, no installation.
+- **`Claude Plugboard-<version>-portable.exe`** — single file, no installation.
 
 Windows 10 or 11, x64. The binaries are unsigned, so SmartScreen warns on first run —
 *More info* → *Run anyway*. Prefer to avoid that? Build it yourself, it takes a minute.
@@ -137,7 +137,7 @@ Claude Code can draw a line of your own at the bottom of the terminal. **Setting
 line** installs one:
 
 ```
-claude-profile-manager │ ⎇ main │ Opus │ work │ Usage: 24% ██░░░░░┃░░ │ Reset: 20:56 (1h 06m)
+claude-plugboard │ main │ Opus │ work │ Usage: 24% ██░░░░░┃░░ │ Reset: 20:56 (1h 06m)
 ```
 
 Directory, git branch, model, which account this app has active, context window, 5-hour and

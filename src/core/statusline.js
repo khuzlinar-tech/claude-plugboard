@@ -34,7 +34,7 @@ const SOURCE_FILE = path.join(__dirname, '..', 'statusline', SCRIPT_NAME);
 
 // Where our own files live. Electron hands over the real user data directory at
 // startup; the default is the same place, so the module is usable on its own.
-let DIR = path.join(process.env.APPDATA || P.HOME, 'Claude Profile Manager', 'statusline');
+let DIR = path.join(process.env.APPDATA || P.HOME, 'Claude Plugboard', 'statusline');
 let SCRIPT = path.join(DIR, SCRIPT_NAME);
 let STATE_FILE = path.join(DIR, 'state.json');
 let BRIDGE_FILE = path.join(DIR, 'bridge.json');

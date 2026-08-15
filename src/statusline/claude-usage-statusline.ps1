@@ -1,4 +1,4 @@
-# Claude Code status line — Claude Profile Manager
+# Claude Code status line — Claude Plugboard
 # script-version: 1
 #
 # Claude Code runs this on every session event and pipes it a JSON document on
@@ -338,9 +338,9 @@ try {
     [void]$parts.Add((Label 'cost' 'Cost') + (Paint ('$' + $usd) 'dim'))
   }
 
-  if ($parts.Count -eq 0) { [void]$parts.Add((Paint 'claude-profile-manager' 'dim')) }
+  if ($parts.Count -eq 0) { [void]$parts.Add((Paint 'claude-plugboard' 'dim')) }
   Write-Output ($parts -join $sep)
 } catch {
   # Last resort: say who is responsible, quietly, and exit clean.
-  Write-Output 'claude-profile-manager: status line unavailable'
+  Write-Output 'claude-plugboard: status line unavailable'
 }

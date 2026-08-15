@@ -2,7 +2,7 @@
 
 ## Not affiliated with Anthropic
 
-Claude Profile Manager is an independent, unofficial tool. It is **not** affiliated with,
+Claude Plugboard is an independent, unofficial tool. It is **not** affiliated with,
 endorsed by, sponsored by, or supported by Anthropic PBC.
 
 "Claude", "Claude Desktop", "Claude Code" and "Anthropic" are trademarks of Anthropic PBC.

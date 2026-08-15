@@ -4,7 +4,7 @@ module.exports = {
   locale: 'ja-JP',
   nativeName: '日本語',
 
-  'app.name': 'Claude Profile Manager',
+  'app.name': 'Claude Plugboard',
 
   'common.cancel': 'キャンセル',
   'common.save': '保存',
@@ -200,7 +200,7 @@ module.exports = {
   'tray.quit': '終了',
   'tray.noProfile': '使用中のプロファイルなし',
   'tray.usageLine': '5時間 {fh}% · 週 {sd}%',
-  'tray.tooltipIdle': 'Claude Profile Manager',
+  'tray.tooltipIdle': 'Claude Plugboard',
   'tray.tooltipProfile': '{slot} · 5時間 {fh}% · 週 {sd}%',
 
   'notif.limitTitle': 'Claude の上限 {pct}%',
