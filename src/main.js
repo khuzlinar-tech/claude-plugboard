@@ -24,6 +24,7 @@ const claudeApp = require('./core/claudeApp');
 const usage = require('./core/usage');
 const cliusage = require('./core/cliusage');
 const apiUsage = require('./core/apiUsage');
+const platformInfo = require('./core/platform');
 const i18n = require('./i18n');
 
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -730,7 +731,10 @@ app.whenReady().then(() => {
   applyLanguage();
   applyTheme();
 
-  if (process.platform !== 'win32') {
+  // An unknown platform cannot even locate Claude's data, so there is nothing
+  // to show. A known-but-unverified one runs read-only; profiles.js blocks the
+  // file moves and the UI explains why.
+  if (!platformInfo.supported) {
     dialog.showErrorBox(t('platform.title'), t('platform.body'));
     app.quit();
     return;
@@ -804,6 +808,11 @@ ipcMain.handle('app:state', async () => {
     claude,
     claudeApp: claudeApp.resolve(config.get('claudeApp')),
     claudeCli: claudeApp.detectCli(),
+    platform: {
+      id: platformInfo.current ? platformInfo.current.id : process.platform,
+      label: platformInfo.current ? platformInfo.current.label : process.platform,
+      canSwitch: platformInfo.canSwitch,
+    },
     current: profiles.readCurrentSlot(),
     profiles: DEMO ? maskProfiles(list) : list,
     storageExists: fs.existsSync(P.PROFILES_DIR),
@@ -973,19 +982,7 @@ ipcMain.handle('app:quit', () => {
  * Opens a console running `claude`, so signing in writes the credentials file
  * this app then finds by itself. Far friendlier than hunting for a JSON field.
  */
-ipcMain.handle('claude:openTerminal', () => {
-  try {
-    const child = require('child_process').spawn('cmd.exe', ['/c', 'start', '""', 'cmd', '/k', 'claude'], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    child.unref();
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-});
+ipcMain.handle('claude:openTerminal', () => claudeApp.openTerminal());
 
 ipcMain.handle('api:calibrate', (_e, { orgUuid, epochMs }) => {
   config.setWeeklyAnchor(orgUuid, epochMs);
@@ -1059,7 +1056,7 @@ ipcMain.handle('claude:chooseExe', async () => {
   const res = await dialog.showOpenDialog(settingsWin || mainWin, {
     title: t('set.chooseExe'),
     properties: ['openFile'],
-    filters: [{ name: 'claude.exe', extensions: ['exe'] }],
+    filters: [platformInfo.current ? platformInfo.current.exeFilter : { name: 'Claude', extensions: ['*'] }],
   });
   if (res.canceled || !res.filePaths[0]) return { ok: false };
   config.set({ claudeApp: { kind: 'exe', path: res.filePaths[0] } });

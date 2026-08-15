@@ -352,7 +352,8 @@ module.exports = {
 
   'platform.title': 'Только Windows',
   'platform.body':
-    'Эта сборка работает в Windows. На других системах Claude Desktop хранит данные иначе, поэтому переключение профилей здесь работать не будет.',
+    'Эта сборка работает в Windows. На macOS то же самое делает нативное приложение Claude Usage Tracker: github.com/hamed-elfayome/Claude-Usage-Tracker',
+  'err.PLATFORM_UNVERIFIED': 'Переключение профилей на этой системе не проверено, поэтому отключено.',
 
   'apiPrompt.title': 'Показывать точные цифры?',
   'apiPrompt.body':

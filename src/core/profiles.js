@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const P = require('./paths');
 const claudeApp = require('./claudeApp');
+const platform = require('./platform');
 
 const SLOT_RE = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/;
 
@@ -268,6 +269,10 @@ async function switchProfile(target, opts = {}) {
 
   if (!SLOT_RE.test(target)) return { ok: false, code: 'BAD_NAME' };
 
+  // Refuse to move session files where the file set has not been confirmed.
+  // Guessing wrong here costs the user their sign-in, not just a wrong reading.
+  if (!platform.canSwitch) return { ok: false, code: 'PLATFORM_UNVERIFIED' };
+
   const state = await claudeApp.isRunning();
   if (state.running) {
     if (!autoClose) return { ok: false, code: 'CLAUDE_RUNNING' };
@@ -319,6 +324,7 @@ function adoptCurrent(name) {
 }
 
 function deleteProfile(slot) {
+  if (!platform.canSwitch) return { ok: false, code: 'PLATFORM_UNVERIFIED' };
   if (slot === readCurrentSlot()) return { ok: false, code: 'IS_ACTIVE' };
   const dir = path.join(P.PROFILES_DIR, slot);
   if (!exists(dir)) return { ok: false, code: 'NOT_FOUND' };

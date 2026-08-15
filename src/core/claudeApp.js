@@ -2,10 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFile, spawn } = require('child_process');
-
-const LOCALAPPDATA = process.env.LOCALAPPDATA || '';
-const PROCESS_NAME = 'claude.exe';
+const { spawn } = require('child_process');
+const P = require('./paths');
+const platform = require('./platform');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -18,62 +17,22 @@ function exists(p) {
   }
 }
 
-/**
- * Finds installed copies of Claude Desktop.
- * The Store edition ships as an MSIX package, the regular one via a Squirrel installer.
- */
+/** Installed copies of Claude Desktop, however this platform ships them. */
 function detectAll() {
-  const found = [];
-
-  // 1. MSIX: %LOCALAPPDATA%\Packages\Claude_<publisherHash>
+  if (!platform.current) return [];
   try {
-    const packages = path.join(LOCALAPPDATA, 'Packages');
-    for (const name of fs.readdirSync(packages)) {
-      if (!/^Claude_[a-z0-9]+$/i.test(name)) continue;
-      found.push({
-        kind: 'store',
-        appId: `${name}!Claude`,
-        label: `Microsoft Store (${name})`,
-        source: 'auto',
-      });
-    }
+    return platform.current.detect();
   } catch {
-    // The Packages directory may not exist on this machine.
+    return [];
   }
-
-  // 2. Squirrel stub, which resolves the current version itself.
-  const squirrel = path.join(LOCALAPPDATA, 'AnthropicClaude', 'claude.exe');
-  if (exists(squirrel)) {
-    found.push({ kind: 'exe', path: squirrel, label: 'AnthropicClaude (installer)', source: 'auto' });
-  }
-
-  // 3. Fallback: a specific version folder inside AnthropicClaude\app-*
-  if (!found.some((f) => f.kind === 'exe')) {
-    try {
-      const base = path.join(LOCALAPPDATA, 'AnthropicClaude');
-      const versions = fs
-        .readdirSync(base)
-        .filter((n) => n.startsWith('app-'))
-        .sort()
-        .reverse();
-      for (const v of versions) {
-        const exe = path.join(base, v, 'claude.exe');
-        if (exists(exe)) {
-          found.push({ kind: 'exe', path: exe, label: `AnthropicClaude ${v.slice(4)}`, source: 'auto' });
-          break;
-        }
-      }
-    } catch {
-      // No installer-based copy present.
-    }
-  }
-
-  return found;
 }
 
-/** Returns the install to use: the manual override, otherwise the first one found. */
+/** The install to use: the manual override, otherwise the first one found. */
 function resolve(override) {
   if (override && override.kind === 'exe' && override.path && exists(override.path)) {
+    return Object.assign({ label: path.basename(override.path), source: 'manual' }, override);
+  }
+  if (override && override.kind === 'app' && override.path && exists(override.path)) {
     return Object.assign({ label: path.basename(override.path), source: 'manual' }, override);
   }
   if (override && override.kind === 'store' && override.appId) {
@@ -83,22 +42,12 @@ function resolve(override) {
 }
 
 function launch(override) {
+  if (!platform.current) return { ok: false, error: 'PLATFORM_UNSUPPORTED' };
   const target = resolve(override);
   if (!target) return { ok: false, error: 'CLAUDE_NOT_FOUND' };
-
   try {
-    if (target.kind === 'store') {
-      // explorer.exe can open packaged apps by AppUserModelID.
-      const child = spawn('explorer.exe', [`shell:AppsFolder\\${target.appId}`], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-      child.unref();
-    } else {
-      const child = spawn(target.path, [], { detached: true, stdio: 'ignore', windowsHide: true });
-      child.unref();
-    }
+    const child = platform.current.launch(target);
+    if (child && child.unref) child.unref();
     return { ok: true, target };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -107,26 +56,23 @@ function launch(override) {
 
 function isRunning() {
   return new Promise((done) => {
-    execFile(
-      'tasklist',
-      ['/FI', `IMAGENAME eq ${PROCESS_NAME}`, '/NH', '/FO', 'CSV'],
-      { windowsHide: true },
-      (err, stdout) => {
-        if (err) return done({ running: false, count: 0 });
-        const lines = String(stdout)
-          .split(/\r?\n/)
-          .filter((l) => l.trim().toLowerCase().startsWith(`"${PROCESS_NAME}"`));
-        done({ running: lines.length > 0, count: lines.length });
-      }
-    );
+    if (!platform.current) return done({ running: false, count: 0 });
+    try {
+      platform.current.listProcesses((count) => done({ running: count > 0, count }));
+    } catch {
+      done({ running: false, count: 0 });
+    }
   });
 }
 
 function kill(force) {
   return new Promise((done) => {
-    const args = ['/IM', PROCESS_NAME, '/T'];
-    if (force) args.push('/F');
-    execFile('taskkill', args, { windowsHide: true }, () => done());
+    if (!platform.current) return done();
+    try {
+      platform.current.kill(force, done);
+    } catch {
+      done();
+    }
   });
 }
 
@@ -153,14 +99,35 @@ async function close() {
 
 /** Detects a Claude Code CLI install, which authenticates through ~/.claude. */
 function detectCli() {
-  const home = process.env.USERPROFILE || '';
-  const claudeDir = path.join(home, '.claude');
   return {
-    present: exists(claudeDir),
-    credentials: exists(path.join(claudeDir, '.credentials.json')),
-    config: exists(path.join(home, '.claude.json')),
-    dir: claudeDir,
+    present: exists(P.CLAUDE_DIR),
+    credentials: exists(path.join(P.CLAUDE_DIR, '.credentials.json')),
+    config: exists(P.CLAUDE_JSON),
+    dir: P.CLAUDE_DIR,
   };
 }
 
-module.exports = { detectAll, detectCli, resolve, launch, isRunning, close, PROCESS_NAME };
+/** Opens a console already running `claude`, so signing in writes the token file. */
+function openTerminal() {
+  if (!platform.current) return { ok: false, error: 'PLATFORM_UNSUPPORTED' };
+  try {
+    const child = platform.current.openTerminalWithClaude();
+    if (child && child.unref) child.unref();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+module.exports = {
+  detectAll,
+  detectCli,
+  resolve,
+  launch,
+  isRunning,
+  close,
+  openTerminal,
+  get PROCESS_NAME() {
+    return platform.current ? platform.current.processName : '';
+  },
+};

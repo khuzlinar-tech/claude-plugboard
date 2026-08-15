@@ -186,6 +186,7 @@ module.exports = {
   'err.USAGE_FILE_MISSING': 'plan-usage-history.json が見つかりません。Claude Desktop を一度は起動してください。',
   'err.USAGE_FILE_BROKEN': '利用履歴を解析できませんでした: {detail}',
   'err.NO_TRANSCRIPTS': 'Claude Code のログが見つかりません（~/.claude/projects が空です）。',
+  'err.PLATFORM_UNVERIFIED': 'このシステムではプロファイル切り替えが未検証のため無効になっています。',
   'err.unknown': '不明なエラー',
 
   'tray.open': '開く',

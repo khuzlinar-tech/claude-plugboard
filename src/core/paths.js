@@ -2,14 +2,18 @@
 
 const os = require('os');
 const path = require('path');
+const platform = require('./platform');
 
 const HOME = os.homedir();
-const APPDATA = process.env.APPDATA || path.join(HOME, 'AppData', 'Roaming');
+
+// Only the Claude data directory differs between systems; the dot-files live in
+// the home directory everywhere. An unsupported platform still yields usable
+// paths so the app can start and explain itself rather than crash.
+const DATA_DIR = platform.current ? platform.current.dataDir : path.join(HOME, 'Claude');
 
 const P = {
   HOME,
-  APPDATA,
-  CLAUDE_APPDATA: path.join(APPDATA, 'Claude'),
+  CLAUDE_APPDATA: DATA_DIR,
   CLAUDE_DIR: path.join(HOME, '.claude'),
   CLAUDE_JSON: path.join(HOME, '.claude.json'),
   PROFILES_DIR: path.join(HOME, '.claude-profiles'),
@@ -22,9 +26,11 @@ P.USAGE_HISTORY = path.join(P.CLAUDE_APPDATA, 'plan-usage-history.json');
 P.PROJECTS_DIR = path.join(P.CLAUDE_DIR, 'projects');
 
 // Account-bound files, grouped by the Claude surface they belong to.
-// The set matches the original claude-switch.ps1 so that external shortcuts
-// built around the same storage layout keep working.
-P.DESKTOP_ITEMS = ['Network', 'Local Storage', 'Session Storage', 'IndexedDB', 'Local State', 'config.json'];
+// On Windows the set matches the original claude-switch.ps1, so external
+// shortcuts built around the same storage layout keep working.
+P.DESKTOP_ITEMS = platform.current
+  ? platform.current.desktopItems
+  : ['Network', 'Local Storage', 'Session Storage', 'IndexedDB', 'Local State', 'config.json'];
 P.HOME_ITEMS = ['.claude.json'];
 P.CLAUDE_DIR_ITEMS = ['.credentials.json'];
 

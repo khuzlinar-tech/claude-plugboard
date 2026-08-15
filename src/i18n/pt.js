@@ -186,6 +186,7 @@ module.exports = {
   'err.USAGE_FILE_MISSING': 'plan-usage-history.json não encontrado. Abra o Claude Desktop pelo menos uma vez.',
   'err.USAGE_FILE_BROKEN': 'Não foi possível ler o histórico de limites: {detail}',
   'err.NO_TRANSCRIPTS': 'Nenhuma transcrição do Claude Code encontrada (~/.claude/projects está vazia).',
+  'err.PLATFORM_UNVERIFIED': 'A troca de perfil não foi verificada neste sistema, por isso está desativada.',
   'err.unknown': 'Erro desconhecido',
 
   'tray.open': 'Abrir',

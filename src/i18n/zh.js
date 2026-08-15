@@ -183,6 +183,7 @@ module.exports = {
   'err.USAGE_FILE_MISSING': '未找到 plan-usage-history.json。请至少打开一次 Claude Desktop。',
   'err.USAGE_FILE_BROKEN': '无法解析用量历史：{detail}',
   'err.NO_TRANSCRIPTS': '未找到 Claude Code 记录（~/.claude/projects 为空）。',
+  'err.PLATFORM_UNVERIFIED': '配置档切换在此系统上未经验证，因此已禁用。',
   'err.unknown': '未知错误',
 
   'tray.open': '打开',

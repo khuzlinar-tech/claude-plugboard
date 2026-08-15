@@ -172,15 +172,24 @@ tools/make-icon.js     icon generator built on zlib alone
 Electron is the only dependency. Charts are hand-drawn SVG, the icons are generated at build
 time from raw pixel data — no chart library, no image toolchain.
 
+## On macOS, use Claude Usage Tracker
+
+[**Claude-Usage-Tracker**](https://github.com/hamed-elfayome/Claude-Usage-Tracker) is a
+native macOS menu-bar app covering this ground on the Mac, and covering it well. It is MIT
+licensed, code signed, and actively maintained. This project stays on Windows and points
+Mac users there rather than shipping a worse second implementation. Its feature set is also
+the reference this app measures itself against — see [PLATFORM-SUPPORT.md](docs/PLATFORM-SUPPORT.md).
+
 ## Compatibility
 
-Windows only, for now. Both Claude Desktop distributions are detected automatically: the
+Windows 10/11, x64. Both Claude Desktop distributions are detected automatically: the
 Microsoft Store (MSIX) build, launched through its AppUserModelID, and the installer
 (Squirrel) build, launched by executable. Override it in **Settings → Claude** if detection
 picks the wrong one.
 
-macOS and Linux would need a different set of paths and a different way to start and stop the
-app; the file-moving core is already platform-agnostic. Contributions welcome.
+Everything system-specific is isolated in `src/core/platform.js`; the rest of the core has
+no platform coupling. A port is possible, but must not enable profile switching until the
+account file set has been confirmed on that system.
 
 The switched file list mirrors the layout Claude Desktop uses today. If a future version
 stores its session elsewhere, switching will need updating — that is the most likely way this

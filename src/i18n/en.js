@@ -350,7 +350,8 @@ module.exports = {
 
   'platform.title': 'Windows only',
   'platform.body':
-    'This build supports Windows. Claude Desktop stores its data differently on other systems, so switching profiles here would not work correctly.',
+    'This build supports Windows. On macOS, Claude Usage Tracker covers the same ground as a native menu-bar app: github.com/hamed-elfayome/Claude-Usage-Tracker',
+  'err.PLATFORM_UNVERIFIED': 'Profile switching is not verified on this system, so it is disabled.',
 
   'apiPrompt.title': 'Show exact usage?',
   'apiPrompt.body':

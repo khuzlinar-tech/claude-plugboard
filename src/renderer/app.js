@@ -368,6 +368,7 @@ function renderOverview(pane, p) {
       <div class="gauge-sub" style="margin-top:12px">${esc(t('ov.manageNote'))}</div>
     </div>`;
 
+
   if (!acc) {
     pane.innerHTML =
       header +

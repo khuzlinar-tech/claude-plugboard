@@ -187,6 +187,7 @@ module.exports = {
   'err.USAGE_FILE_MISSING': 'plan-usage-history.json introuvable. Ouvrez Claude Desktop au moins une fois.',
   'err.USAGE_FILE_BROKEN': 'Impossible de lire l’historique des limites : {detail}',
   'err.NO_TRANSCRIPTS': 'Aucune transcription Claude Code trouvée (~/.claude/projects est vide).',
+  'err.PLATFORM_UNVERIFIED': 'Le basculement de profil n’est pas vérifié sur ce système, il est donc désactivé.',
   'err.unknown': 'Erreur inconnue',
 
   'tray.open': 'Ouvrir',
