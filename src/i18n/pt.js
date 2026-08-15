@@ -333,14 +333,6 @@ module.exports = {
     'Quando ligado, o aplicativo lê o token OAuth que o Claude Code guardou nesta máquina e pede ao endpoint de uso da Anthropic os números e horários de reinício exatos. O token vai apenas para api.anthropic.com, apenas no cabeçalho, e nunca é armazenado ou registrado. Este é o único recurso que usa a rede.',
   'set.apiAllWarning':
     'Consultar várias contas a partir de uma mesma máquina e IP é exatamente o padrão que parece automação multiconta. O risco recai sobre suas contas, não sobre este aplicativo. Ative apenas se aceitar isso.',
-  'set.apiToken': 'Token manual',
-  'set.apiTokenSet': 'há um token salvo para este perfil',
-  'set.apiTokenNone': 'sem token manual',
-  'set.apiTokenEnter': 'Informar token…',
-  'set.apiTokenClear': 'Remover token',
-  'set.apiTokenHelpTitle': 'Como obter o token',
-  'set.apiTokenHelp':
-    'O token é o valor de “accessToken” dentro do arquivo .credentials.json na sua pasta .claude, que aparece depois de entrar no Claude Code. Abra esse arquivo, copie a longa string accessToken e cole aqui. Ela fica criptografada nesta máquina.',
   'set.calibration': 'Horário do reinício semanal',
   'set.calibrationHint':
     'O arquivo em disco não permite fixar o reinício semanal exato. Informe o horário que a própria tela de uso do Claude mostra (por exemplo “quarta 07:00”) e a partir daí ele será exato. Aprendido sozinho assim que um reinício for observado.',
@@ -357,4 +349,18 @@ module.exports = {
   'platform.title': 'Somente Windows',
   'platform.body':
     'Esta compilação funciona no Windows. Em outros sistemas o Claude Desktop guarda seus dados de outra forma, então a troca de perfis não funcionaria corretamente.',
+
+  'set.apiToken': 'Acesso por perfil',
+  'set.apiTokenHow': 'Nada a copiar: entre no Claude Code e o aplicativo encontra o token sozinho. Abra um terminal, execute o comando claude, faça login e depois clique em “Verificar de novo”.',
+  'set.apiTokenOpenTerminal': 'Abrir terminal com claude',
+  'set.apiTokenRecheck': 'Verificar de novo',
+  'set.apiTokenFound': 'Pronto — token encontrado automaticamente',
+  'set.apiTokenManual': 'Pronto — token informado manualmente',
+  'set.apiTokenExpiredShort': 'Token expirado — entre no Claude Code novamente',
+  'set.apiTokenMissing': 'Sem login no Claude Code neste perfil',
+  'set.apiTokenSwitchNote': 'Faça login enquanto este perfil estiver ativo, senão o token vai para o espaço errado.',
+  'set.apiTokenAdvanced': 'Colar um token manualmente',
+  'set.apiTokenEnter': 'Colar token',
+  'set.apiTokenClear': 'Remover token',
+  'set.apiTokenWhere': 'Só é necessário se o caminho automático não servir. O token é o valor “accessToken” em .credentials.json na sua pasta .claude. Fica criptografado nesta máquina.',
 };

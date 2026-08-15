@@ -73,9 +73,9 @@ Two ways to get exact reset times:
    unless you widen it. Only works for profiles signed into Claude Code; otherwise the
    app offers to take a token by hand. Details in [SECURITY.md](SECURITY.md).
 
-| Limits | Claude Code |
-|---|---|
-| ![Limits](docs/screenshot-limits.png) | ![Claude Code](docs/screenshot-code.png) |
+| Limits | Claude Code | Tray |
+|---|---|---|
+| ![Limits](docs/screenshot-limits.png) | ![Claude Code](docs/screenshot-code.png) | ![Tray](docs/screenshot-tray.png) |
 
 ## Install
 

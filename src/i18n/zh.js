@@ -329,14 +329,6 @@ module.exports = {
     '开启后，应用会读取 Claude Code 保存在本机的 OAuth 令牌，向 Anthropic 的用量接口查询准确的数值与重置时间。令牌只发往 api.anthropic.com，只出现在请求头中，不会被保存或记录。这是本应用唯一会使用网络的功能。',
   'set.apiAllWarning':
     '从同一台机器、同一个 IP 查询多个账户，正是看起来像多账号自动化的行为模式。风险落在你的账户上，而不是这个应用。只有接受这一点再开启。',
-  'set.apiToken': '手动令牌',
-  'set.apiTokenSet': '此配置档已保存令牌',
-  'set.apiTokenNone': '没有手动令牌',
-  'set.apiTokenEnter': '填写令牌…',
-  'set.apiTokenClear': '删除令牌',
-  'set.apiTokenHelpTitle': '如何获取令牌',
-  'set.apiTokenHelp':
-    '令牌是 .claude 文件夹内 .credentials.json 文件中「accessToken」字段的值，登录 Claude Code 后即会生成。打开该文件，复制那串很长的 accessToken 并粘贴到这里。它会加密保存在本机。',
   'set.calibration': '每周重置时间',
   'set.calibrationHint':
     '磁盘上的文件无法确定准确的每周重置时刻。请填入 Claude 自身用量页面显示的时间（例如「星期三 07:00」），此后即为准确值。一旦观察到一次重置，也会自动学到。',
@@ -353,4 +345,18 @@ module.exports = {
   'platform.title': '仅支持 Windows',
   'platform.body':
     '此版本面向 Windows。在其他系统上 Claude Desktop 的数据存放方式不同，配置档切换将无法正常工作。',
+
+  'set.apiToken': '各配置档的访问',
+  'set.apiTokenHow': '无需复制任何内容：登录 Claude Code，应用会自行找到令牌。打开终端，运行 claude 命令，按提示登录，然后回来点击「重新检查」。',
+  'set.apiTokenOpenTerminal': '打开终端并运行 claude',
+  'set.apiTokenRecheck': '重新检查',
+  'set.apiTokenFound': '就绪 — 已自动找到令牌',
+  'set.apiTokenManual': '就绪 — 已手动填写令牌',
+  'set.apiTokenExpiredShort': '令牌已过期 — 请重新登录 Claude Code',
+  'set.apiTokenMissing': '此配置档尚未登录 Claude Code',
+  'set.apiTokenSwitchNote': '请在该配置档处于使用中时登录，否则令牌会落到错误的槽位。',
+  'set.apiTokenAdvanced': '改为手动粘贴令牌',
+  'set.apiTokenEnter': '粘贴令牌',
+  'set.apiTokenClear': '删除令牌',
+  'set.apiTokenWhere': '仅在自动方式不可行时才需要。令牌是 .claude 文件夹内 .credentials.json 中「accessToken」的值，在本机加密保存。',
 };

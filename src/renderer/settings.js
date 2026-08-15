@@ -12,7 +12,7 @@ async function loadTokens() {
   S.tokens = await Promise.all(
     S.state.profiles.map(async (p) => {
       const st = await window.api.apiTokenState(p.slot);
-      return Object.assign({ slot: p.slot, label: p.label || p.slot }, st);
+      return Object.assign({ slot: p.slot, label: p.label || p.slot, isActive: p.isActive }, st);
     })
   );
 }
@@ -204,32 +204,60 @@ function renderClaude(pane) {
     )
     .join('');
 
+  // Status per profile, worded so the normal path (sign into Claude Code) reads
+  // as the answer and pasting a token stays a fallback.
   const tokenRows = (S.tokens || [])
-    .map(
-      (x) => `<div class="row">
+    .map((x) => {
+      let state;
+      let cls = 'ok';
+      if (x.hasManual) state = t('set.apiTokenManual');
+      else if (x.hasCode && !x.codeExpired) state = t('set.apiTokenFound');
+      else if (x.hasCode) {
+        state = t('set.apiTokenExpiredShort');
+        cls = 'warn';
+      } else {
+        state = t('set.apiTokenMissing');
+        cls = 'warn';
+      }
+      return `<div class="row">
         <div class="row-text">
-          <div class="row-t">${esc(x.label)}</div>
-          <div class="row-h">${esc(
-            x.hasManual ? t('set.apiTokenSet') : x.hasCode ? (x.codeExpired ? t('err.API_TOKEN_EXPIRED') : t('set.apiTokenSet')) : t('set.apiTokenNone')
-          )}</div>
+          <div class="row-t">${esc(x.label)}${x.isActive ? ` <span class="badge badge-active">${esc(t('side.active'))}</span>` : ''}</div>
+          <div class="row-h token-${cls}">${esc(state)}</div>
         </div>
         <div class="head-actions">
-          <button class="btn btn-sm" data-token-set="${esc(x.slot)}">${esc(t('set.apiTokenEnter'))}</button>
           ${x.hasManual ? `<button class="btn btn-sm btn-ghost" data-token-clear="${esc(x.slot)}">${esc(t('set.apiTokenClear'))}</button>` : ''}
         </div>
-      </div>`
-    )
+      </div>`;
+    })
     .join('');
+
+  const tokenBlock = `
+    <div style="margin-top:14px">
+      <div class="row-t" style="margin-bottom:6px">${esc(t('set.apiToken'))}</div>
+      ${tokenRows}
+      <div class="row-h" style="margin-top:10px">${esc(t('set.apiTokenHow'))}</div>
+      <div class="row-h" style="margin-top:4px">${esc(t('set.apiTokenSwitchNote'))}</div>
+      <div class="head-actions" style="margin-top:10px">
+        <button class="btn btn-sm btn-primary" data-act="openTerminal">${esc(t('set.apiTokenOpenTerminal'))}</button>
+        <button class="btn btn-sm" data-act="recheckTokens">${esc(t('set.apiTokenRecheck'))}</button>
+      </div>
+      <details class="advanced">
+        <summary>${esc(t('set.apiTokenAdvanced'))}</summary>
+        <div class="row-h" style="margin:8px 0 10px">${esc(t('set.apiTokenWhere'))}</div>
+        <div class="head-actions">
+          ${(S.tokens || [])
+            .map((x) => `<button class="btn btn-sm" data-token-set="${esc(x.slot)}">${esc(x.label)}: ${esc(t('set.apiTokenEnter'))}</button>`)
+            .join('')}
+        </div>
+      </details>
+    </div>`;
 
   pane.innerHTML =
     section(
       t('set.liveUsage'),
       apiModes +
         `<div class="row-h" style="margin-top:10px">${esc(t('set.apiModeHint'))}</div>` +
-        (S.cfg.apiMode !== 'off'
-          ? `<div style="margin-top:14px"><div class="row-t" style="margin-bottom:4px">${esc(t('set.apiToken'))}</div>${tokenRows}
-             <div class="row-h" style="margin-top:8px"><b>${esc(t('set.apiTokenHelpTitle'))}.</b> ${esc(t('set.apiTokenHelp'))}</div></div>`
-          : '')
+        (S.cfg.apiMode !== 'off' ? tokenBlock : '')
     ) +
     section(
       t('set.scope'),
@@ -382,7 +410,7 @@ function wire(pane) {
     el.addEventListener('click', async () => {
       const token = await ui.prompt({
         title: t('dlg.tokenTitle'),
-        message: t('set.apiTokenHelp'),
+        message: t('set.apiTokenWhere'),
         value: '',
         confirmText: t('common.save'),
         cancelText: t('common.cancel'),
@@ -421,6 +449,16 @@ function wire(pane) {
           toast(t('toast.saved'), 'ok');
           return;
         }
+
+        case 'openTerminal':
+          await window.api.openClaudeTerminal();
+          return;
+
+        case 'recheckTokens':
+          await loadTokens();
+          render();
+          toast(t('set.apiTokenRecheck'), 'ok');
+          return;
 
         case 'terms':
           window.api.consent.show();

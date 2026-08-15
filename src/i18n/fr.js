@@ -334,14 +334,6 @@ module.exports = {
     'Une fois activé, l’application lit le jeton OAuth que Claude Code a enregistré sur cette machine et demande au point d’accès « usage » d’Anthropic les valeurs et heures de réinitialisation exactes. Le jeton part uniquement vers api.anthropic.com, uniquement dans l’en-tête, et n’est ni stocké ni journalisé. C’est la seule fonction qui utilise le réseau.',
   'set.apiAllWarning':
     'Interroger plusieurs comptes depuis une même machine et une même IP correspond exactement au schéma qui ressemble à de l’automatisation multicompte. Le risque porte sur vos comptes, pas sur cette application. À n’activer que si vous l’acceptez.',
-  'set.apiToken': 'Jeton manuel',
-  'set.apiTokenSet': 'un jeton est enregistré pour ce profil',
-  'set.apiTokenNone': 'aucun jeton manuel',
-  'set.apiTokenEnter': 'Saisir le jeton…',
-  'set.apiTokenClear': 'Supprimer le jeton',
-  'set.apiTokenHelpTitle': 'Où trouver le jeton',
-  'set.apiTokenHelp':
-    'Le jeton est la valeur de « accessToken » dans le fichier .credentials.json de votre dossier .claude, présent après connexion à Claude Code. Ouvrez ce fichier, copiez la longue chaîne accessToken et collez-la ici. Elle est conservée chiffrée sur cette machine.',
   'set.calibration': 'Heure de réinitialisation hebdomadaire',
   'set.calibrationHint':
     'Le fichier sur disque ne permet pas de fixer la réinitialisation hebdomadaire exacte. Saisissez l’heure affichée par la vue d’usage de Claude (par exemple « mercredi 07:00 ») et elle sera exacte ensuite. Apprise automatiquement dès qu’une réinitialisation est observée.',
@@ -358,4 +350,18 @@ module.exports = {
   'platform.title': 'Windows uniquement',
   'platform.body':
     'Cette version fonctionne sous Windows. Sur les autres systèmes, Claude Desktop range ses données autrement : le basculement de profils ne fonctionnerait pas correctement.',
+
+  'set.apiToken': 'Accès par profil',
+  'set.apiTokenHow': 'Rien à copier : connectez-vous à Claude Code et l’application trouvera le jeton toute seule. Ouvrez un terminal, lancez la commande claude, connectez-vous, puis revenez et cliquez sur « Revérifier ».',
+  'set.apiTokenOpenTerminal': 'Ouvrir un terminal avec claude',
+  'set.apiTokenRecheck': 'Revérifier',
+  'set.apiTokenFound': 'Prêt — jeton trouvé automatiquement',
+  'set.apiTokenManual': 'Prêt — jeton saisi à la main',
+  'set.apiTokenExpiredShort': 'Jeton expiré — reconnectez-vous à Claude Code',
+  'set.apiTokenMissing': 'Pas connecté à Claude Code sur ce profil',
+  'set.apiTokenSwitchNote': 'Connectez-vous pendant que ce profil est actif, sinon le jeton ira dans le mauvais emplacement.',
+  'set.apiTokenAdvanced': 'Coller un jeton manuellement',
+  'set.apiTokenEnter': 'Coller le jeton',
+  'set.apiTokenClear': 'Supprimer le jeton',
+  'set.apiTokenWhere': 'Utile seulement si la voie automatique ne convient pas. Le jeton est la valeur « accessToken » de .credentials.json dans votre dossier .claude. Il est conservé chiffré sur cette machine.',
 };

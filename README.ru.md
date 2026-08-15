@@ -77,9 +77,9 @@ Max, переключение означает выход, вход заново
    вошедших в Claude Code; иначе приложение предложит ввести токен вручную. Подробности —
    в [SECURITY.md](SECURITY.md).
 
-| Лимиты | Claude Code |
-|---|---|
-| ![Лимиты](docs/screenshot-limits.png) | ![Claude Code](docs/screenshot-code.png) |
+| Лимиты | Claude Code | Трей |
+|---|---|---|
+| ![Лимиты](docs/screenshot-limits.png) | ![Claude Code](docs/screenshot-code.png) | ![Трей](docs/screenshot-tray.png) |
 
 ## Установка
 

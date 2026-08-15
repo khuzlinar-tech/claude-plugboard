@@ -12,6 +12,7 @@ const {
   nativeImage,
   nativeTheme,
   safeStorage,
+  screen,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -33,6 +34,7 @@ const RESET_MIN_DROP = 25;
 let mainWin = null;
 let settingsWin = null;
 let consentWin = null;
+let popupWin = null;
 let tray = null;
 let pollTimer = null;
 let usageWatcher = null;
@@ -163,7 +165,7 @@ function send(win, channel, payload) {
 }
 
 function broadcast(channel, payload) {
-  for (const w of [mainWin, settingsWin, consentWin]) send(w, channel, payload);
+  for (const w of [mainWin, settingsWin, consentWin, popupWin]) send(w, channel, payload);
 }
 
 function dictPayload() {
@@ -185,7 +187,7 @@ function applyTheme() {
   const source = config.get('theme');
   nativeTheme.themeSource = ['dark', 'light'].includes(source) ? source : 'system';
   const bg = nativeTheme.shouldUseDarkColors ? '#1b1a19' : '#faf9f5';
-  for (const w of [mainWin, settingsWin, consentWin]) {
+  for (const w of [mainWin, settingsWin, consentWin, popupWin]) {
     if (w && !w.isDestroyed()) w.setBackgroundColor(bg);
   }
   broadcast('theme:changed', themePayload());
@@ -329,6 +331,78 @@ function openConsent(mode) {
   });
 }
 
+/* ------------------------------------------------------------- tray popup */
+
+const POPUP_W = 340;
+const POPUP_H = 560;
+
+function createPopup() {
+  popupWin = new BrowserWindow({
+    width: POPUP_W,
+    height: POPUP_H,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    fullscreenable: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1b1a19' : '#faf9f5',
+    webPreferences: webPreferences(),
+  });
+
+  popupWin.loadFile(path.join(__dirname, 'renderer', 'popup.html'));
+  popupWin.setMenu(null);
+
+  // Behaves like a tray flyout: clicking anywhere else dismisses it.
+  popupWin.on('blur', () => {
+    if (popupWin && !popupWin.isDestroyed() && popupWin.isVisible()) popupWin.hide();
+  });
+  popupWin.on('closed', () => {
+    popupWin = null;
+  });
+  popupWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+}
+
+/** Places the flyout next to the tray icon, clamped to the working area. */
+function positionPopup() {
+  if (!popupWin || !tray) return;
+  let bounds;
+  try {
+    bounds = tray.getBounds();
+  } catch {
+    return;
+  }
+  const display = screen.getDisplayMatching(bounds.width ? bounds : { x: bounds.x, y: bounds.y, width: 1, height: 1 });
+  const area = display.workArea;
+  const [w, h] = popupWin.getSize();
+
+  let x = Math.round(bounds.x + bounds.width / 2 - w / 2);
+  // Taskbar at the bottom is the common case; flip above when there is no room below.
+  let y = bounds.y > area.y + area.height / 2 ? bounds.y - h - 8 : bounds.y + bounds.height + 8;
+
+  x = Math.max(area.x + 6, Math.min(x, area.x + area.width - w - 6));
+  y = Math.max(area.y + 6, Math.min(y, area.y + area.height - h - 6));
+  popupWin.setPosition(x, y, false);
+}
+
+function togglePopup() {
+  if (!popupWin) createPopup();
+  if (popupWin.isVisible()) {
+    popupWin.hide();
+    return;
+  }
+  send(popupWin, 'popup:refresh');
+  positionPopup();
+  popupWin.show();
+  popupWin.focus();
+}
+
 /* -------------------------------------------------------------------- tray */
 
 function activeUsage(list) {
@@ -342,7 +416,9 @@ function activeUsage(list) {
 function buildTray() {
   if (!tray) {
     tray = new Tray(nativeImage.createFromPath(path.join(ASSETS, 'tray.ico')));
-    tray.on('click', () => (mainWin && mainWin.isVisible() ? mainWin.hide() : showMain()));
+    // Left click opens the flyout; the full menu stays on right click.
+    tray.on('click', () => togglePopup());
+    tray.on('double-click', () => showMain());
   }
 
   let list = [];
@@ -634,6 +710,15 @@ async function runScreenshots() {
   const simg = await settingsWin.webContents.capturePage();
   fs.writeFileSync(path.join(outDir, 'screenshot-settings.png'), simg.toPNG());
 
+  if (popupWin && !popupWin.isDestroyed()) {
+    send(popupWin, 'popup:refresh');
+    positionPopup();
+    popupWin.show();
+    await wait(1500);
+    const pimg = await popupWin.webContents.capturePage();
+    fs.writeFileSync(path.join(outDir, 'screenshot-tray.png'), pimg.toPNG());
+  }
+
   isQuitting = true;
   app.quit();
 }
@@ -682,6 +767,7 @@ app.whenReady().then(() => {
 function startApp() {
   createMainWindow();
   buildTray();
+  createPopup(); // built hidden up front so the flyout opens instantly
   startPolling();
   startUsageWatch();
   checkLimits();
@@ -831,6 +917,74 @@ ipcMain.handle('api:setToken', (_e, { slot, token }) => {
   storeManualToken(slot, token || null);
   broadcast('config:changed', config.all());
   return { ok: true };
+});
+
+/** Compact payload for the tray flyout: one call, everything it draws. */
+ipcMain.handle('popup:data', async () => {
+  const list = profiles.listProfiles({ withSize: false });
+  const plan = readUsage();
+  learnAnchors(plan);
+
+  const claude = lastRunning || (await claudeApp.isRunning());
+  const masked = DEMO ? maskUsage(plan) : plan;
+
+  return {
+    claude,
+    profiles: (DEMO ? maskProfiles(list) : list).map((p) => ({
+      slot: p.slot,
+      label: p.label,
+      isActive: p.isActive,
+      email: p.account ? p.account.email : null,
+      plan: p.account ? p.account.plan : null,
+      org: p.account ? p.account.organizationUuid : null,
+    })),
+    orgs: masked.ok ? masked.orgs : {},
+    api: Object.fromEntries([...apiCache.entries()].map(([k, v]) => [k, v.result])),
+    apiMode: config.get('apiMode'),
+  };
+});
+
+ipcMain.handle('popup:switch', async (_e, slot) => {
+  const state = await claudeApp.isRunning();
+  if (popupWin && popupWin.isVisible()) popupWin.hide();
+  if (state.running) {
+    requestSwitchInWindow(slot);
+    return { ok: false, code: 'CLAUDE_RUNNING', deferred: true };
+  }
+  return doSwitch(slot, false);
+});
+
+ipcMain.on('popup:hide', () => {
+  if (popupWin && !popupWin.isDestroyed()) popupWin.hide();
+});
+
+ipcMain.handle('app:showMain', (_e, tab) => {
+  showMain(tab);
+  return { ok: true };
+});
+
+ipcMain.handle('app:quit', () => {
+  isQuitting = true;
+  app.quit();
+  return { ok: true };
+});
+
+/**
+ * Opens a console running `claude`, so signing in writes the credentials file
+ * this app then finds by itself. Far friendlier than hunting for a JSON field.
+ */
+ipcMain.handle('claude:openTerminal', () => {
+  try {
+    const child = require('child_process').spawn('cmd.exe', ['/c', 'start', '""', 'cmd', '/k', 'claude'], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 });
 
 ipcMain.handle('api:calibrate', (_e, { orgUuid, epochMs }) => {

@@ -9,6 +9,14 @@ contextBridge.exposeInMainWorld('api', {
   apiUsage: (force) => ipcRenderer.invoke('usage:api', { force }),
   cliUsage: () => ipcRenderer.invoke('usage:cli'),
 
+  openMain: (tab) => ipcRenderer.invoke('app:showMain', tab),
+  quitApp: () => ipcRenderer.invoke('app:quit'),
+
+  popupData: () => ipcRenderer.invoke('popup:data'),
+  popupSwitch: (slot) => ipcRenderer.invoke('popup:switch', slot),
+  popupHide: () => ipcRenderer.send('popup:hide'),
+  openClaudeTerminal: () => ipcRenderer.invoke('claude:openTerminal'),
+
   apiTokenState: (slot) => ipcRenderer.invoke('api:tokenState', slot),
   setApiToken: (slot, token) => ipcRenderer.invoke('api:setToken', { slot, token }),
   calibrateWeekly: (orgUuid, epochMs) => ipcRenderer.invoke('api:calibrate', { orgUuid, epochMs }),
@@ -55,6 +63,7 @@ contextBridge.exposeInMainWorld('api', {
   onNavigate: (cb) => ipcRenderer.on('nav:tab', (_e, tab) => cb(tab)),
   onSwitchRequest: (cb) => ipcRenderer.on('ui:switchRequest', (_e, slot) => cb(slot)),
   onApiPrompt: (cb) => ipcRenderer.on('ui:apiPrompt', () => cb()),
+  onPopupRefresh: (cb) => ipcRenderer.on('popup:refresh', () => cb()),
   onCliProgress: (cb) => ipcRenderer.on('usage:cliProgress', (_e, data) => cb(data)),
 
   win: {

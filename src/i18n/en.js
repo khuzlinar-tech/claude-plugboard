@@ -297,14 +297,21 @@ module.exports = {
     'When on, the app reads the OAuth token Claude Code stored on this machine and asks Anthropic’s usage endpoint for exact figures and reset times. The token is sent only to api.anthropic.com, only in the request header, and never stored or logged. This is the only feature that makes any network request.',
   'set.apiAllWarning':
     'Querying several accounts from one machine and IP is exactly the pattern that looks like multi-account automation. The risk is to your accounts, not to this app. Only enable this if you accept that.',
-  'set.apiToken': 'Manual token',
-  'set.apiTokenSet': 'a token is saved for this profile',
-  'set.apiTokenNone': 'no manual token',
-  'set.apiTokenEnter': 'Enter token…',
+  'set.apiToken': 'Access per profile',
+  'set.apiTokenHow':
+    'Nothing to copy: sign into Claude Code and the app finds the token by itself. Open a terminal, run the claude command, sign in when it asks — then come back and press “Check again”.',
+  'set.apiTokenOpenTerminal': 'Open terminal with claude',
+  'set.apiTokenRecheck': 'Check again',
+  'set.apiTokenFound': 'Ready — token found automatically',
+  'set.apiTokenManual': 'Ready — token entered by hand',
+  'set.apiTokenExpiredShort': 'Token expired — sign into Claude Code again',
+  'set.apiTokenMissing': 'Not signed into Claude Code on this profile',
+  'set.apiTokenSwitchNote': 'Sign in while this profile is the active one, otherwise the token lands in the wrong slot.',
+  'set.apiTokenAdvanced': 'Paste a token manually instead',
+  'set.apiTokenEnter': 'Paste token',
   'set.apiTokenClear': 'Remove token',
-  'set.apiTokenHelpTitle': 'How to get the token',
-  'set.apiTokenHelp':
-    'The token is the value of "accessToken" inside the file .credentials.json in your .claude folder, present after you sign into Claude Code. Open that file, copy the long accessToken string, and paste it here. It stays encrypted on this machine.',
+  'set.apiTokenWhere':
+    'Only needed if the automatic way will not work. The token is the "accessToken" value in .credentials.json inside your .claude folder. It is stored encrypted on this machine.',
   'set.calibration': 'Weekly reset time',
   'set.calibrationHint':
     'The file on disk cannot pin the exact weekly reset. Enter the time Claude’s own usage view shows (for example “Wed 07:00”) and it will be exact from then on. Learned automatically once a reset is observed.',

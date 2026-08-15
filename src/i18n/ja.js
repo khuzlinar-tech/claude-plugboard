@@ -332,14 +332,6 @@ module.exports = {
     '有効にすると、Claude Code がこのパソコンに保存した OAuth トークンを読み取り、Anthropic の利用状況エンドポイントに正確な数値とリセット時刻を問い合わせます。トークンは api.anthropic.com にのみ、リクエストヘッダーの中だけで送られ、保存も記録もされません。ネットワークを使うのはこの機能だけです。',
   'set.apiAllWarning':
     '同じパソコン・同じ IP から複数アカウントを問い合わせる動きは、まさに複数アカウントの自動化に見えるパターンです。リスクを負うのは本アプリではなくあなたのアカウントです。承知のうえでのみ有効にしてください。',
-  'set.apiToken': '手動トークン',
-  'set.apiTokenSet': 'このプロファイル用のトークンを保存済み',
-  'set.apiTokenNone': '手動トークンなし',
-  'set.apiTokenEnter': 'トークンを入力…',
-  'set.apiTokenClear': 'トークンを削除',
-  'set.apiTokenHelpTitle': 'トークンの入手方法',
-  'set.apiTokenHelp':
-    'トークンは .claude フォルダ内の .credentials.json にある「accessToken」の値で、Claude Code にサインインすると作成されます。そのファイルを開き、長い accessToken の文字列をコピーしてここに貼り付けてください。このパソコン上では暗号化して保存されます。',
   'set.calibration': '週次リセットの時刻',
   'set.calibrationHint':
     'ディスク上のファイルからは正確な週次リセット時刻を特定できません。Claude 本体の利用状況画面が示す時刻（例：「水曜 07:00」）を入力すれば、以降は正確になります。リセットを一度観測できれば自動で学習します。',
@@ -356,4 +348,18 @@ module.exports = {
   'platform.title': 'Windows 専用',
   'platform.body':
     'このビルドは Windows 向けです。他の OS では Claude Desktop のデータ保存場所が異なるため、プロファイルの切り替えは正しく動作しません。',
+
+  'set.apiToken': 'プロファイルごとのアクセス',
+  'set.apiTokenHow': 'コピーは不要です。Claude Code にサインインすれば、アプリが自動でトークンを見つけます。ターミナルを開いて claude コマンドを実行し、サインインしてから「再確認」を押してください。',
+  'set.apiTokenOpenTerminal': 'claude を実行するターミナルを開く',
+  'set.apiTokenRecheck': '再確認',
+  'set.apiTokenFound': '準備完了 — トークンを自動的に検出しました',
+  'set.apiTokenManual': '準備完了 — トークンを手動入力済み',
+  'set.apiTokenExpiredShort': 'トークンが期限切れ — Claude Code に再サインイン',
+  'set.apiTokenMissing': 'このプロファイルでは Claude Code にサインインしていません',
+  'set.apiTokenSwitchNote': 'このプロファイルが使用中のあいだにサインインしてください。そうしないと別のスロットに入ります。',
+  'set.apiTokenAdvanced': '代わりにトークンを手動で貼り付ける',
+  'set.apiTokenEnter': 'トークンを貼り付け',
+  'set.apiTokenClear': 'トークンを削除',
+  'set.apiTokenWhere': '自動の方法が使えない場合のみ必要です。トークンは .claude フォルダ内 .credentials.json の「accessToken」の値で、このパソコンでは暗号化して保存されます。',
 };

@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0]
+
+### Added
+
+- **Tray flyout.** Left-clicking the tray icon now opens a small panel with the active
+  account, usage meters with reset captions, one-click switching to the other profiles,
+  and buttons to open the app or launch Claude — instead of jumping straight to the main
+  window. The full menu stays on right click, and double click still opens the app.
+
+### Changed
+
+- **The token setup no longer asks you to dig through a JSON file.** The normal path is
+  now stated plainly: open a terminal, run `claude`, sign in, and the app finds the token
+  by itself. There is a button that opens a console already running the command, and a
+  "Check again" button next to a per-profile status that says whether the token was found
+  automatically, entered by hand, expired, or is missing. Pasting a token by hand is still
+  possible, moved behind a collapsed "advanced" section where it belongs.
+- The per-profile status no longer reports "token saved" for both automatic and manual
+  tokens, which made it impossible to tell what was actually configured.
+
 ## [1.3.0]
 
 ### Fixed
