@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve
+      description: Describe the situation you run into, not only the feature you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Please confirm
+      options:
+        - label: This does not involve evading usage limits, sharing accounts, or otherwise working around Anthropic's terms
+          required: true

@@ -1,0 +1,8 @@
+# Normalise line endings so contributors on other systems do not see whole-file diffs.
+* text=auto eol=lf
+
+# Windows batch files must keep CRLF to run correctly.
+*.bat text eol=crlf
+
+*.png binary
+*.ico binary

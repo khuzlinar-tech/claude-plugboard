@@ -1,0 +1,39 @@
+name: Translation
+description: Add or correct a language
+labels: ["i18n"]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: "Italian (it)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - A new language I would like to contribute
+        - A correction to an existing translation
+        - A request for a language I cannot translate myself
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: |
+        For corrections, please give the key and the suggested wording, for example:
+        `set.trayHint` — "…"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        Adding a language is one file: see the Translations section of
+        [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md). Untranslated keys fall back to
+        English at runtime, so partial translations are welcome.

@@ -1,0 +1,85 @@
+{
+  "name": "claude-profile-manager",
+  "productName": "Claude Profile Manager",
+  "version": "1.2.0",
+  "description": "Switch between multiple Claude accounts on Windows and see the plan, subscription and rate-limit usage of each one.",
+  "keywords": [
+    "claude",
+    "claude-desktop",
+    "claude-code",
+    "anthropic",
+    "account-switcher",
+    "profile-switcher",
+    "profile-manager",
+    "multi-account",
+    "rate-limit",
+    "usage-dashboard",
+    "token-usage",
+    "electron",
+    "windows",
+    "desktop-app",
+    "tray-app"
+  ],
+  "homepage": "https://github.com/khuzlinar-tech/claude-profile-manager",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/khuzlinar-tech/claude-profile-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/khuzlinar-tech/claude-profile-manager/issues"
+  },
+  "license": "MIT",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "electron .",
+    "icon": "node tools/make-icon.js",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64",
+    "release": "electron-builder --win --x64 --publish always"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.github.claude-profile-manager",
+    "productName": "Claude Profile Manager",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "assets/icon.ico",
+      "assets/tray.ico",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Claude Profile Manager",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "publish": {
+      "provider": "github"
+    },
+    "compression": "normal"
+  }
+}

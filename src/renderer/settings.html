@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+<title>Settings</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="settings-body">
+
+<header class="titlebar">
+  <div class="tb-brand">
+    <svg class="tb-logo" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="12" height="12" rx="3" fill="#7484a0"/>
+      <rect x="7" y="7" width="13.5" height="13.5" rx="3.4" fill="#1b1a19"/>
+      <rect x="8.5" y="8.5" width="12" height="12" rx="3" fill="#e4a062"/>
+    </svg>
+    <span data-i18n="set.title"></span>
+  </div>
+  <div class="tb-center"></div>
+  <div class="tb-controls">
+    <button id="winClose" class="tb-btn tb-close" data-title="tb.close">
+      <svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.3"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="tabs settings-tabs" id="tabs">
+  <button class="tab is-active" data-tab="general" data-i18n="set.tab.general"></button>
+  <button class="tab" data-tab="claude" data-i18n="set.tab.claude"></button>
+  <button class="tab" data-tab="paths" data-i18n="set.tab.paths"></button>
+  <button class="tab" data-tab="about" data-i18n="set.tab.about"></button>
+</nav>
+
+<div class="pane" id="pane"></div>
+<div id="toast" class="toast"></div>
+
+<script src="ui.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

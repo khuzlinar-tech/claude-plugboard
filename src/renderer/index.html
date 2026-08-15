@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+<title>Claude Profile Manager</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="titlebar">
+  <div class="tb-brand">
+    <svg class="tb-logo" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="12" height="12" rx="3" fill="#7484a0"/>
+      <rect x="7" y="7" width="13.5" height="13.5" rx="3.4" fill="#1b1a19"/>
+      <rect x="8.5" y="8.5" width="12" height="12" rx="3" fill="#e4a062"/>
+    </svg>
+    <span data-i18n="app.name">Claude Profile Manager</span>
+  </div>
+
+  <div class="tb-center">
+    <div id="claudeState" class="pill pill-idle">
+      <span class="dot"></span><span id="claudeStateText"></span>
+    </div>
+  </div>
+
+  <div class="tb-controls">
+    <button id="btnRefresh" class="tb-btn tb-tool" data-title="tb.refresh">
+      <svg viewBox="0 0 16 16"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3.2h-3.2"
+        fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button id="btnSettings" class="tb-btn tb-tool" data-title="tb.settings">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="8" cy="8" r="2.3"/>
+        <path d="M8 1.6v1.6M8 12.8v1.6M14.4 8h-1.6M3.2 8H1.6M12.5 3.5l-1.1 1.1M4.6 11.4l-1.1 1.1M12.5 12.5l-1.1-1.1M4.6 4.6L3.5 3.5"
+          stroke-linecap="round"/>
+      </svg>
+    </button>
+    <span class="tb-sep"></span>
+    <button id="winMin" class="tb-btn" data-title="tb.minimize"><svg viewBox="0 0 16 16"><path d="M3 8h10" stroke="currentColor" stroke-width="1.3"/></svg></button>
+    <button id="winMax" class="tb-btn" data-title="tb.maximize"><svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></button>
+    <button id="winClose" class="tb-btn tb-close" data-title="tb.close"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.3"/></svg></button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="side-head">
+      <span data-i18n="side.profiles"></span>
+      <span id="profileCount" class="side-count"></span>
+    </div>
+    <div id="profileList" class="profile-list"></div>
+    <button id="btnAdd" class="btn btn-ghost btn-add" data-i18n="side.add"></button>
+  </aside>
+
+  <main class="main">
+    <nav class="tabs" id="tabs">
+      <button class="tab is-active" data-tab="overview" data-i18n="tab.overview"></button>
+      <button class="tab" data-tab="limits" data-i18n="tab.limits"></button>
+      <button class="tab" data-tab="code" data-i18n="tab.code"></button>
+    </nav>
+    <div class="pane" id="pane"></div>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="ui.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
