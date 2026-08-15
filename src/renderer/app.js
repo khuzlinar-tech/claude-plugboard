@@ -101,6 +101,28 @@ function fmtDuration(ms) {
   return unit(Math.floor(h / 24), 'day');
 }
 
+/**
+ * A ticking countdown: seconds matter inside the last hour, and only there.
+ * Used for the live reset timers; static text keeps fmtDuration.
+ */
+function fmtCountdown(ms) {
+  if (ms == null || ms < 0) return DASH;
+  const unit = (value, name) =>
+    new Intl.NumberFormat(LOCALE, { style: 'unit', unit: name, unitDisplay: 'short' }).format(value);
+
+  const total = Math.floor(ms / 1000);
+  const days = Math.floor(total / 86400);
+  if (days >= 1) {
+    const hours = Math.floor((total % 86400) / 3600);
+    return hours ? `${unit(days, 'day')} ${unit(hours, 'hour')}` : unit(days, 'day');
+  }
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours >= 1) return minutes ? `${unit(hours, 'hour')} ${unit(minutes, 'minute')}` : unit(hours, 'hour');
+  const seconds = total % 60;
+  return minutes ? `${unit(minutes, 'minute')} ${unit(seconds, 'second')}` : unit(seconds, 'second');
+}
+
 function relTime(ts) {
   if (!ts) return DASH;
   const diff = Date.now() - ts;
@@ -208,8 +230,12 @@ async function refresh({ silent, forceApi } = {}) {
     if (state.config && state.config.apiMode !== 'off') {
       window.api
         .apiUsage(!!forceApi)
-        .then((r) => {
+        .then(async (r) => {
           S.api = (r && r.results) || {};
+          // A successful reading is folded into the same "exact" source the
+          // local view already draws from, so re-read it instead of repeating
+          // the source preference here. S.api is kept for reporting failures.
+          S.plan = await window.api.planUsage();
           render();
         })
         .catch(() => {});
@@ -404,7 +430,7 @@ function renderOverview(pane, p) {
 
       <div class="card">
         <h2>${esc(t('ov.limits'))}</h2>
-        ${u ? gaugesHtml(u, apiFor(p)) : `<div class="muted" style="padding:8px 0">${esc(t('ov.noSamples'))}</div>`}
+        ${u ? gaugesHtml(u) : `<div class="muted" style="padding:8px 0">${esc(t('ov.noSamples'))}</div>`}
         ${
           u
             ? `<div class="gauge-sub" style="margin-top:14px">
@@ -433,72 +459,114 @@ function renderOverview(pane, p) {
   wireActions(pane);
 }
 
-function gaugeSvg(pct, color) {
+/**
+ * The ring, plus a tick at the fraction of the window already elapsed. The
+ * stylesheet rotates the whole SVG by -90°, so angle 0 here is the top.
+ */
+function gaugeSvg(pct, color, elapsed) {
   const r = 40;
   const c = 2 * Math.PI * r;
   const on = (Math.max(0, Math.min(100, pct)) / 100) * c;
+
+  let mark = '';
+  if (elapsed != null) {
+    const a = 2 * Math.PI * Math.max(0, Math.min(1, elapsed));
+    const at = (radius) => [(48 + radius * Math.cos(a)).toFixed(2), (48 + radius * Math.sin(a)).toFixed(2)];
+    const [x1, y1] = at(r - 7);
+    const [x2, y2] = at(r + 7);
+    mark = `<line class="pace-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"></line>`;
+  }
+
   return `<svg viewBox="0 0 96 96">
     <circle class="track" cx="48" cy="48" r="${r}"></circle>
     <circle class="fill" cx="48" cy="48" r="${r}" stroke="${color}"
       stroke-dasharray="${on.toFixed(1)} ${(c - on).toFixed(1)}"></circle>
+    ${mark}
   </svg>`;
 }
 
-/**
- * Reset caption for the 5-hour window (estimate has resetBefore + known).
- */
-function fhCaption(fh, api) {
-  const exact = api && api.fiveHour && api.fiveHour.resetAt;
-  if (exact) {
-    const dur = exact - Date.now();
-    return {
-      text: dur > 0 ? t('lim.resetExactIn', { when: fmtDateTime(exact), dur: fmtDuration(dur) }) : t('lim.resetExact', { when: fmtDateTime(exact) }),
-      tag: t('lim.viaApi'),
-    };
+// Marks the spot in a caption where the ticking countdown belongs. An invisible
+// separator survives HTML escaping untouched, which a placeholder like {dur}
+// would not.
+const CD = '⁣';
+
+function sourceTag(source) {
+  if (source === 'code') return t('lim.viaCode');
+  if (source === 'api') return t('lim.viaApi');
+  return null;
+}
+
+/** Reset caption for the 5-hour window: exact when a real reset time is known. */
+function fhCaption(u) {
+  const e = u.exact && u.exact.fh;
+  if (e && e.resetAt) {
+    return { text: t('lim.resetExactIn', { when: fmtDateTime(e.resetAt), dur: CD }), tag: sourceTag(e.source), until: e.resetAt };
   }
-  if (!fh.known) return { text: t('lim.notStarted'), tag: null };
-  return {
-    text: t('lim.resetBefore', { time: fmtTime(fh.resetBefore), dur: fmtDuration(fh.resetBefore - Date.now()) }),
-    tag: null,
-  };
+  if (!u.fiveHour.known) return { text: t('lim.notStarted') };
+  return { text: t('lim.resetBefore', { time: fmtTime(u.fiveHour.resetBefore), dur: CD }), until: u.fiveHour.resetBefore };
 }
 
 /**
- * Reset caption for the weekly window (estimate has resetAt + known + exact).
- * Priority: API exact → calibrated/observed exact → upper-bound → unknown.
+ * Reset caption for the weekly window.
+ * Priority: exact reset time → calibrated or observed anchor → upper bound → unknown.
  */
-function sdCaption(sd, api) {
-  const exact = api && api.weekly && api.weekly.resetAt;
-  if (exact) return { text: t('lim.resetExact', { when: fmtDateTime(exact) }), tag: t('lim.viaApi') };
-  if (!sd.known) return { text: t('lim.resetUnknown'), tag: null };
-  if (sd.exact) return { text: t('lim.resetExact', { when: fmtDateTime(sd.resetAt) }), tag: null };
-  return { text: t('lim.resetBeforeAt', { when: fmtDateTime(sd.resetAt) }), tag: null };
+function sdCaption(u) {
+  const e = u.exact && u.exact.sd;
+  if (e && e.resetAt) {
+    return { text: t('lim.resetExactIn', { when: fmtDateTime(e.resetAt), dur: CD }), tag: sourceTag(e.source), until: e.resetAt };
+  }
+  if (!u.weekly.known) return { text: t('lim.resetUnknown') };
+  if (u.weekly.exact) return { text: t('lim.resetExactIn', { when: fmtDateTime(u.weekly.resetAt), dur: CD }), until: u.weekly.resetAt };
+  return { text: t('lim.resetBeforeAt', { when: fmtDateTime(u.weekly.resetAt) }) };
 }
 
 function captionHtml(c) {
-  if (!c.text) return '';
-  return `${esc(c.text)}${c.tag ? ` <span class="src-tag">${esc(c.tag)}</span>` : ''}`;
+  if (!c || !c.text) return '';
+  let html = esc(c.text);
+  if (c.until) {
+    html = html.replace(
+      CD,
+      `<span class="cd" data-until="${c.until}">${esc(fmtCountdown(c.until - Date.now()))}</span>`
+    );
+  }
+  return `${html}${c.tag ? ` <span class="src-tag">${esc(c.tag)}</span>` : ''}`;
 }
 
-function gaugesHtml(u, api) {
-  const fh = api && api.fiveHour ? api.fiveHour.value : u.latest.fh;
-  const sd = api && api.weekly ? api.weekly.value : u.latest.sd;
+/**
+ * "At this rate" — nothing more. The projection is the current rate carried to
+ * the end of the window, which is worth saying only once enough of the window
+ * has passed for the rate to mean something; the core returns null before that.
+ */
+function paceHtml(p, long) {
+  if (!p || p.level === 'idle') return '';
+  const text = p.exhaustAt
+    ? t('lim.paceOver', { when: long ? fmtDateTime(p.exhaustAt) : fmtTime(p.exhaustAt) })
+    : t('lim.paceOk', { pct: Math.round(p.projected) });
+  return `<div class="pace pace-${esc(p.level)}">${esc(text)}</div>`;
+}
+
+function gaugesHtml(u) {
+  const fh = u.exact && u.exact.fh ? u.exact.fh.value : u.latest.fh;
+  const sd = u.exact && u.exact.sd ? u.exact.sd.value : u.latest.sd;
+  const pace = u.pace || {};
 
   return `<div class="gauges">
     <div class="gauge">
-      ${gaugeSvg(fh, usageColor(fh))}
+      ${gaugeSvg(fh, usageColor(fh), pace.fh ? pace.fh.elapsed : null)}
       <div>
         <div class="gauge-label">${esc(t('lim.fh'))}</div>
         <div class="gauge-value">${fh}<small>%</small></div>
-        <div class="gauge-sub">${captionHtml(fhCaption(u.fiveHour, api))}</div>
+        <div class="gauge-sub">${captionHtml(fhCaption(u))}</div>
+        ${paceHtml(pace.fh, false)}
       </div>
     </div>
     <div class="gauge">
-      ${gaugeSvg(sd, sd >= 90 ? C.danger : C.blue)}
+      ${gaugeSvg(sd, sd >= 90 ? C.danger : C.blue, pace.sd ? pace.sd.elapsed : null)}
       <div>
         <div class="gauge-label">${esc(t('lim.sd'))}</div>
         <div class="gauge-value">${sd}<small>%</small></div>
-        <div class="gauge-sub">${captionHtml(sdCaption(u.weekly, api))}</div>
+        <div class="gauge-sub">${captionHtml(sdCaption(u))}</div>
+        ${paceHtml(pace.sd, true)}
       </div>
     </div>
   </div>`;
@@ -544,7 +612,7 @@ function renderLimits(pane, p) {
 
     ${
       u
-        ? `<div class="card">${gaugesHtml(u, apiFor(p))}
+        ? `<div class="card">${gaugesHtml(u)}
       <div class="head-actions" style="margin-top:14px">
         <button class="btn btn-sm btn-ghost" data-act="calibrate" data-slot="${esc(p.slot)}">${esc(t('lim.calibrate'))}</button>
       </div>
@@ -1146,6 +1214,31 @@ async function doSwitch(slot) {
   setTimeout(() => refresh({ silent: true }), 600);
 }
 
+/* ----------------------------------------------------------- countdowns */
+
+/**
+ * Every live reset timer on screen, updated by one shared tick. When a window
+ * runs out the figures behind it are stale, so the view is reloaded once —
+ * not once per element.
+ */
+function tickCountdowns() {
+  const now = Date.now();
+  let expired = false;
+
+  $$('[data-until]').forEach((el) => {
+    const left = Number(el.dataset.until) - now;
+    if (left > 0) {
+      el.textContent = fmtCountdown(left);
+      return;
+    }
+    el.textContent = t('lim.resetNow');
+    el.removeAttribute('data-until');
+    expired = true;
+  });
+
+  if (expired) refresh({ silent: true, forceApi: true });
+}
+
 /* ---------------------------------------------------------------- start */
 
 /** A switch asked for from the tray, confirmed here so the dialog matches the app. */
@@ -1246,6 +1339,7 @@ async function init() {
   await refresh();
   if (pendingSwitch) runTraySwitch(pendingSwitch);
   setInterval(() => refresh({ silent: true }), 60000);
+  setInterval(tickCountdowns, 1000);
 }
 
 init();

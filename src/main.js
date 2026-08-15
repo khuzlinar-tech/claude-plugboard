@@ -27,12 +27,19 @@ const apiUsage = require('./core/apiUsage');
 const trayIcon = require('./core/trayIcon');
 const versions = require('./core/versions');
 const platformInfo = require('./core/platform');
+const statusline = require('./core/statusline');
+const pace = require('./core/pace');
 const i18n = require('./i18n');
 
 const ASSETS = path.join(__dirname, '..', 'assets');
 
 // A drop of at least this many percent counts as a limit window reset.
 const RESET_MIN_DROP = 25;
+
+// A Claude Code session left running across a profile switch can keep using the
+// previous account's credentials while reporting under the new profile, so
+// figures recorded around a switch are ignored rather than mis-attributed.
+const BRIDGE_SETTLE_MS = 45 * 1000;
 
 let mainWin = null;
 let settingsWin = null;
@@ -41,10 +48,14 @@ let popupWin = null;
 let tray = null;
 let pollTimer = null;
 let usageWatcher = null;
+let bridgeWatcher = null;
 let lastRunning = null;
 let isQuitting = false;
 let lang = 'en';
 let switching = false;
+
+// Exact rate limits captured by the status line script, keyed by organization.
+let bridgeOrgs = Object.create(null);
 
 // org -> { fh: {value, notifiedFor}, sd: {...} } — keeps notifications to one per window
 const limitState = Object.create(null);
@@ -56,9 +67,137 @@ const API_MIN_INTERVAL_MS = 3 * 60 * 1000;
 
 const t = (key, params) => i18n.translate(lang, key, params);
 
-/** Reads plan usage with the stored weekly anchors applied. */
+/** Reads plan usage with the stored weekly anchors applied, and decorates it. */
 function readUsage() {
-  return usage.readPlanUsage({ anchors: config.get('weeklyAnchors') || {} });
+  return decorate(usage.readPlanUsage({ anchors: config.get('weeklyAnchors') || {} }));
+}
+
+/* ----------------------------------------------------- exact figures, bridge */
+
+/** True when two moments are the same point of the weekly cycle. */
+function sameWeeklyMoment(a, b) {
+  const d = Math.abs(a - b) % pace.SEVEN_DAYS;
+  return Math.min(d, pace.SEVEN_DAYS - d) < 60 * 1000;
+}
+
+/**
+ * Reloads the figures the status line script recorded from Claude Code.
+ *
+ * These are the exact percentages and real reset moments Anthropic hands to
+ * Claude Code, arriving here through a local file and no network of our own. A
+ * weekly reset seen this way is kept as an anchor: it is the same moment every
+ * week, so one observation makes every later estimate exact.
+ */
+function reloadBridge() {
+  const cutoff = Number(config.get('lastSwitchAt')) || 0;
+  const orgs = Object.create(null);
+  for (const [org, e] of Object.entries(statusline.readBridge().orgs)) {
+    if (!e || typeof e.at !== 'number') continue;
+    if (e.at < cutoff + BRIDGE_SETTLE_MS) continue;
+    orgs[org] = e;
+  }
+  bridgeOrgs = orgs;
+
+  const anchors = config.get('weeklyAnchors') || {};
+  for (const [org, e] of Object.entries(orgs)) {
+    const at = e.sd && e.sd.resetAt;
+    if (at && !(anchors[org] && sameWeeklyMoment(anchors[org], at))) config.setWeeklyAnchor(org, at);
+  }
+}
+
+/**
+ * The best figures known for one organization.
+ *
+ * The bridge and the optional API both give an exact percentage and a real
+ * reset time. The sample file gives neither, but is sometimes the most recent
+ * thing available — so its value wins when it is newer, while the exact reset
+ * time is kept either way. `stale` says the value came from the sample file.
+ */
+function exactFor(org, u) {
+  const sources = [];
+  const b = bridgeOrgs[org];
+  if (b && b.at) sources.push({ at: b.at, source: 'code', fh: b.fh, sd: b.sd });
+
+  const cached = apiCache.get(org);
+  if (cached && cached.result && cached.result.ok) {
+    sources.push({
+      at: cached.result.fetchedAt || cached.at,
+      source: 'api',
+      fh: cached.result.fiveHour,
+      sd: cached.result.weekly,
+    });
+  }
+  if (!sources.length) return null;
+
+  sources.sort((x, y) => y.at - x.at);
+  const best = sources[0];
+  const sampleIsNewer = u.last > best.at;
+  const now = Date.now();
+
+  const pick = (w, sampleValue) => {
+    if (!w || !Number.isFinite(w.value)) return null;
+    // A reset time already in the past describes a window that has since rolled
+    // over, so the whole entry is out of date.
+    if (w.resetAt && w.resetAt <= now) return null;
+    return {
+      value: Math.round(sampleIsNewer ? sampleValue : w.value),
+      resetAt: w.resetAt || null,
+      source: best.source,
+      at: best.at,
+      stale: sampleIsNewer,
+    };
+  };
+
+  const fh = pick(best.fh, u.latest.fh);
+  const sd = pick(best.sd, u.latest.sd);
+  if (!fh && !sd) return null;
+  return { fh, sd, source: best.source, at: best.at };
+}
+
+/** Pace for both windows, from the best window bounds available. */
+function paceFor(u, exact) {
+  const compute = (value, endMs, span, isExact) => {
+    const bounds = pace.boundsFromEnd(endMs, span);
+    if (!bounds) return null;
+    const p = pace.pace({ value, startMs: bounds.startMs, endMs: bounds.endMs });
+    return p ? Object.assign(p, { exact: isExact, endMs }) : null;
+  };
+
+  const fhExact = !!(exact && exact.fh && exact.fh.resetAt);
+  const sdExact = !!(exact && exact.sd && exact.sd.resetAt);
+
+  return {
+    fh: compute(
+      exact && exact.fh ? exact.fh.value : u.latest.fh,
+      fhExact ? exact.fh.resetAt : u.fiveHour.resetBefore,
+      pace.FIVE_HOURS,
+      fhExact
+    ),
+    sd: compute(
+      exact && exact.sd ? exact.sd.value : u.latest.sd,
+      sdExact ? exact.sd.resetAt : u.weekly.resetAt,
+      pace.SEVEN_DAYS,
+      sdExact || !!(u.weekly && u.weekly.exact)
+    ),
+  };
+}
+
+/** Adds the exact-source and pace fields the interface draws. */
+function decorate(plan) {
+  if (!plan || !plan.ok) return plan;
+  const orgs = {};
+  for (const [org, u] of Object.entries(plan.orgs)) {
+    const exact = exactFor(org, u);
+    orgs[org] = Object.assign({}, u, { exact, pace: paceFor(u, exact) });
+  }
+  return Object.assign({}, plan, { orgs });
+}
+
+/** The percentage to act on: exact when known, otherwise the last sample. */
+function currentValue(u, key) {
+  if (!u) return null;
+  if (u.exact && u.exact[key]) return u.exact[key].value;
+  return u.latest[key];
 }
 
 /**
@@ -133,6 +272,121 @@ async function apiUsageFor(profile, force) {
   return result;
 }
 
+/* -------------------------------------------------------------- status line */
+
+/** Unicode by default; the ASCII set exists for terminals with a legacy font. */
+function statuslineGlyphs() {
+  return config.get('statuslineAscii')
+    ? { sep: ' | ', full: '#', empty: '.', mark: '|', branch: '' }
+    : { sep: ' │ ', full: '█', empty: '░', mark: '┃', branch: '⎇' };
+}
+
+/** Whether the interface language formats time on a 12-hour clock. */
+function prefers24h() {
+  try {
+    const locale = i18n.dict(lang).locale;
+    return new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12 !== true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Publishes everything the status line script needs: the display choices, the
+ * translated labels, and this app's own figures as a fallback for accounts
+ * where Claude Code does not report rate limits.
+ */
+function pushStatuslineState({ force = false } = {}) {
+  if (!force && !config.get('statuslineEnabled')) return;
+
+  let list = [];
+  try {
+    list = profiles.listProfiles({ withSize: false });
+  } catch {
+    // Storage may not exist yet; the status line then simply has no profile.
+  }
+  const active = list.find((p) => p.isActive) || null;
+  const org = active && active.account ? active.account.organizationUuid : null;
+
+  const plan = readUsage();
+  const u = org && plan.ok ? plan.orgs[org] : null;
+
+  statusline.writeState({
+    version: 1,
+    updatedAt: Date.now(),
+    profile: active ? { slot: active.slot, label: active.label || active.slot, org } : null,
+    segments: config.get('statuslineSegments') || [],
+    labels: !!config.get('statuslineLabels'),
+    labelsText: {
+      ctx: t('sl.label.ctx'),
+      usage: t('sl.label.usage'),
+      week: t('sl.label.week'),
+      reset: t('sl.label.reset'),
+      cost: t('sl.label.cost'),
+    },
+    pace: !!config.get('statuslinePace'),
+    color: config.get('statuslineColor') || 'multi',
+    bridge: !!config.get('statuslineBridge'),
+    time24: prefers24h(),
+    glyphs: statuslineGlyphs(),
+    fallback: u
+      ? {
+          fh: currentValue(u, 'fh'),
+          sd: currentValue(u, 'sd'),
+          fhResetAt: (u.exact && u.exact.fh && u.exact.fh.resetAt) || u.fiveHour.resetBefore || null,
+          sdResetAt: (u.exact && u.exact.sd && u.exact.sd.resetAt) || u.weekly.resetAt || null,
+        }
+      : null,
+  });
+}
+
+function startBridgeWatch() {
+  if (bridgeWatcher) return;
+  try {
+    fs.mkdirSync(statusline.DIR, { recursive: true });
+    bridgeWatcher = fs.watch(statusline.DIR, (_event, filename) => {
+      if (!filename || !String(filename).startsWith('bridge.json')) return;
+      clearTimeout(startBridgeWatch._t);
+      startBridgeWatch._t = setTimeout(() => {
+        reloadBridge();
+        broadcast('usage:changed');
+        buildTray();
+      }, 400);
+    });
+  } catch {
+    // Without the watcher the figures still arrive, just on the next refresh.
+  }
+}
+
+function stopBridgeWatch() {
+  if (!bridgeWatcher) return;
+  bridgeWatcher.close();
+  bridgeWatcher = null;
+}
+
+/** Brings ~/.claude/settings.json in line with the setting. */
+function applyStatusline() {
+  if (config.get('statuslineEnabled')) {
+    const res = statusline.install({ refreshSec: config.get('statuslineRefreshSec') });
+    if (res.ok) {
+      // Remember a status line that was already configured, so switching this
+      // off puts the user's own one back rather than leaving them without.
+      if (res.previous && !config.get('statuslinePrev')) config.set({ statuslinePrev: res.previous });
+      pushStatuslineState();
+      reloadBridge();
+      startBridgeWatch();
+    }
+    broadcast('statusline:changed', Object.assign({ enabled: true }, res));
+    return res;
+  }
+
+  const res = statusline.uninstall(config.get('statuslinePrev'));
+  if (res.ok && config.get('statuslinePrev')) config.set({ statuslinePrev: null });
+  stopBridgeWatch();
+  broadcast('statusline:changed', Object.assign({ enabled: false }, res));
+  return res;
+}
+
 /* ---------------------------------------------------------- single instance */
 
 if (!app.requestSingleInstanceLock()) {
@@ -181,7 +435,9 @@ function themePayload() {
 }
 
 function applyLanguage() {
-  lang = i18n.resolveLang(config.get('language'), app.getLocale());
+  // Documentation images are shot in English, whatever the machine's language,
+  // so the screenshots in the README match the text around them.
+  lang = DEMO ? 'en' : i18n.resolveLang(config.get('language'), app.getLocale());
   broadcast('i18n:changed', dictPayload());
   buildTray();
 }
@@ -461,10 +717,13 @@ function buildTray() {
   const { active, u } = activeUsage(list);
   const running = lastRunning && lastRunning.running;
 
+  const fhNow = currentValue(u, 'fh');
+  const sdNow = currentValue(u, 'sd');
+
   const header = [
     { label: active ? `${active.label || active.slot}${active.account ? ` — ${active.account.email}` : ''}` : t('tray.noProfile'), enabled: false },
   ];
-  if (u) header.push({ label: t('tray.usageLine', { fh: u.latest.fh, sd: u.latest.sd }), enabled: false });
+  if (u) header.push({ label: t('tray.usageLine', { fh: fhNow, sd: sdNow }), enabled: false });
 
   const menu = Menu.buildFromTemplate([
     ...header,
@@ -512,12 +771,10 @@ function buildTray() {
   ]);
 
   tray.setToolTip(
-    u
-      ? t('tray.tooltipProfile', { slot: active.label || active.slot, fh: u.latest.fh, sd: u.latest.sd })
-      : t('tray.tooltipIdle')
+    u ? t('tray.tooltipProfile', { slot: active.label || active.slot, fh: fhNow, sd: sdNow }) : t('tray.tooltipIdle')
   );
   tray.setContextMenu(menu);
-  updateTrayIcon(u ? u.latest[config.get('trayMetric') === 'sd' ? 'sd' : 'fh'] : null);
+  updateTrayIcon(u ? (config.get('trayMetric') === 'sd' ? sdNow : fhNow) : null);
 }
 
 /** Hands the switch to the main window so the confirmation matches the app's own style. */
@@ -557,6 +814,15 @@ async function doSwitch(slot, autoClose) {
     claudeApp: config.get('claudeApp'),
   });
   switching = false;
+
+  if (res.ok && !res.unchanged) {
+    // The status line now belongs to a different account: re-publish its state
+    // and mark the moment, so figures recorded around it are not mis-attributed.
+    config.set({ lastSwitchAt: Date.now() });
+    reloadBridge();
+    pushStatuslineState();
+  }
+
   await pollOnce();
   broadcast('profiles:changed');
   return res;
@@ -622,9 +888,11 @@ function checkLimits() {
     if (!limitState[org]) limitState[org] = {};
 
     for (const key of ['fh', 'sd']) {
-      const value = u.latest[key];
-      // Identifies the current limit window, so one notification is sent per window.
-      const window = key === 'fh' ? u.fiveHour.openedBy : u.weekly.resetBefore;
+      const value = currentValue(u, key);
+      // Identifies the current limit window, so one notification is sent per
+      // window. An exact reset time is the sharper identifier when there is one.
+      const exact = u.exact && u.exact[key] && u.exact[key].resetAt;
+      const window = exact || (key === 'fh' ? u.fiveHour.openedBy : u.weekly.resetAt);
       const prev = limitState[org][key];
 
       if (wantReset && prev && prev.value - value >= RESET_MIN_DROP) {
@@ -639,7 +907,11 @@ function checkLimits() {
       const seen = prev && prev.window === window ? prev.seen || [] : [];
       let notifiedSeen = seen;
 
-      if (!u.stale && reached != null && window && !seen.includes(reached)) {
+      // A stale sample file says nothing about now — unless an exact figure
+      // arrived through the status line bridge or the API, which is current.
+      const stale = u.stale && !exact;
+
+      if (!stale && reached != null && window && !seen.includes(reached)) {
         notify(
           t('notif.limitTitle', { pct: reached }),
           t('notif.limitBody', { slot: name, window: t(`notif.window.${key}`), pct: value })
@@ -661,6 +933,7 @@ function startUsageWatch() {
         broadcast('usage:changed');
         checkLimits();
         buildTray();
+        pushStatuslineState(); // keep the terminal's fallback figures current
       }, 800);
     });
   } catch {
@@ -750,6 +1023,12 @@ async function runScreenshots() {
   const simg = await settingsWin.webContents.capturePage();
   fs.writeFileSync(path.join(outDir, 'screenshot-settings.png'), simg.toPNG());
 
+  // The status line tab, once its preview has actually run the script.
+  await settingsWin.webContents.executeJavaScript("document.querySelector('.tab[data-tab=statusline]').click()");
+  await wait(3500);
+  const slimg = await settingsWin.webContents.capturePage();
+  fs.writeFileSync(path.join(outDir, 'screenshot-statusline.png'), slimg.toPNG());
+
   if (popupWin && !popupWin.isDestroyed()) {
     send(popupWin, 'popup:refresh');
     positionPopup();
@@ -767,6 +1046,7 @@ async function runScreenshots() {
 
 app.whenReady().then(() => {
   config.init(app.getPath('userData'));
+  statusline.init(app.getPath('userData'));
   applyLanguage();
   applyTheme();
 
@@ -802,6 +1082,12 @@ app.whenReady().then(() => {
     if (changed.includes('notifications')) buildTray();
     if (changed.some((k) => k === 'trayStyle' || k === 'trayMetric' || k === 'trayMono')) buildTray();
     if (changed.includes('apiMode')) apiCache.clear();
+
+    // The status line: switching it on or changing the refresh timer rewrites
+    // ~/.claude/settings.json; everything else only rewrites our own state file.
+    if (changed.includes('statuslineEnabled') || changed.includes('statuslineRefreshSec')) applyStatusline();
+    else if (changed.some((k) => k.startsWith('statusline')) || changed.includes('language')) pushStatuslineState();
+
     broadcast('config:changed', config.all());
   });
 
@@ -809,12 +1095,17 @@ app.whenReady().then(() => {
 });
 
 function startApp() {
+  reloadBridge();
   createMainWindow();
   buildTray();
   createPopup(); // built hidden up front so the flyout opens instantly
   startPolling();
   startUsageWatch();
   checkLimits();
+
+  // Keeps the installed script and its state in step with the app: an update
+  // may ship a newer script, and the labels follow the interface language.
+  if (config.get('statuslineEnabled')) applyStatusline();
 
   if (process.argv.includes('--settings')) openSettings();
   if (process.argv.includes('--screenshot')) runScreenshots();
@@ -836,6 +1127,7 @@ app.on('before-quit', () => {
   isQuitting = true;
   if (pollTimer) clearInterval(pollTimer);
   if (usageWatcher) usageWatcher.close();
+  stopBridgeWatch();
 });
 
 /* --------------------------------------------------------------------- IPC */
@@ -865,6 +1157,8 @@ ipcMain.handle('app:state', async () => {
       usageHistory: P.USAGE_HISTORY,
       projectsDir: P.PROJECTS_DIR,
       settingsFile: path.join(app.getPath('userData'), 'settings.json'),
+      statuslineDir: statusline.DIR,
+      claudeSettings: statusline.SETTINGS_FILE,
     }),
     switched: {
       appItems: P.DESKTOP_ITEMS,
@@ -967,6 +1261,54 @@ ipcMain.handle('api:setToken', (_e, { slot, token }) => {
   broadcast('config:changed', config.all());
   return { ok: true };
 });
+
+/* -------------------------------------------------------- status line IPC */
+
+ipcMain.handle('statusline:status', () => {
+  const st = statusline.status();
+  const orgs = Object.entries(bridgeOrgs).map(([org, e]) => ({ org, at: e.at, cc: e.cc || null }));
+  return Object.assign(st, {
+    bridge: orgs,
+    paths: DEMO ? maskPaths({ scriptPath: st.scriptPath, settingsPath: st.settingsPath }) : null,
+  });
+});
+
+/**
+ * Runs the script exactly as Claude Code would and returns the line. Previewing
+ * writes the script and its state, but never touches ~/.claude/settings.json —
+ * so the terminal is only changed once the setting is actually turned on.
+ */
+ipcMain.handle('statusline:preview', async () => {
+  const sync = statusline.syncScript();
+  if (!sync.ok) return sync;
+  pushStatuslineState({ force: true });
+
+  let list = [];
+  try {
+    list = profiles.listProfiles({ withSize: false });
+  } catch {
+    /* no storage yet */
+  }
+  const active = list.find((p) => p.isActive);
+  const org = active && active.account ? active.account.organizationUuid : null;
+  const e = org ? bridgeOrgs[org] : null;
+
+  const extra = {};
+  if (e && (e.fh || e.sd)) {
+    const win = (w) => (w ? { used_percentage: w.value, resets_at: w.resetAt ? Math.round(w.resetAt / 1000) : null } : undefined);
+    extra.rate_limits = { five_hour: win(e.fh), seven_day: win(e.sd) };
+  }
+  // The home directory carries the Windows user name, which must not appear in
+  // documentation images; a plain project path shows the same thing.
+  if (DEMO) {
+    const dir = 'C:/Users/alex/projects/web-app';
+    Object.assign(extra, { cwd: dir, workspace: { current_dir: dir, project_dir: dir } });
+  }
+  return statusline.preview(statusline.sampleInput(extra));
+});
+
+/** Rewrites the script and the settings entry, for when either drifted. */
+ipcMain.handle('statusline:reinstall', () => applyStatusline());
 
 /** Compact payload for the tray flyout: one call, everything it draws. */
 ipcMain.handle('popup:data', async () => {
@@ -1076,6 +1418,7 @@ ipcMain.handle('profile:meta', (_e, { slot, patch }) => {
   const res = profiles.setProfileMeta(slot, patch);
   broadcast('profiles:changed');
   buildTray();
+  pushStatuslineState(); // the display name is shown in the terminal too
   return res;
 });
 
@@ -1111,6 +1454,7 @@ ipcMain.handle('shell:open', (_e, target) => {
     claudeDir: P.CLAUDE_DIR,
     projectsDir: P.PROJECTS_DIR,
     settingsFile: app.getPath('userData'),
+    statuslineDir: statusline.DIR,
   };
   const dir = allowed[target] || (target && target.startsWith(P.PROFILES_DIR) ? target : null);
   if (!dir) return { ok: false };

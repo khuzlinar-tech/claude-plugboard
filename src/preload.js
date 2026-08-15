@@ -17,6 +17,12 @@ contextBridge.exposeInMainWorld('api', {
   popupHide: () => ipcRenderer.send('popup:hide'),
   openClaudeTerminal: () => ipcRenderer.invoke('claude:openTerminal'),
 
+  statusline: {
+    status: () => ipcRenderer.invoke('statusline:status'),
+    preview: () => ipcRenderer.invoke('statusline:preview'),
+    reinstall: () => ipcRenderer.invoke('statusline:reinstall'),
+  },
+
   apiTokenState: (slot) => ipcRenderer.invoke('api:tokenState', slot),
   setApiToken: (slot, token) => ipcRenderer.invoke('api:setToken', { slot, token }),
   calibrateWeekly: (orgUuid, epochMs) => ipcRenderer.invoke('api:calibrate', { orgUuid, epochMs }),
@@ -63,6 +69,7 @@ contextBridge.exposeInMainWorld('api', {
   onNavigate: (cb) => ipcRenderer.on('nav:tab', (_e, tab) => cb(tab)),
   onSwitchRequest: (cb) => ipcRenderer.on('ui:switchRequest', (_e, slot) => cb(slot)),
   onApiPrompt: (cb) => ipcRenderer.on('ui:apiPrompt', () => cb()),
+  onStatuslineChanged: (cb) => ipcRenderer.on('statusline:changed', (_e, data) => cb(data)),
   onPopupRefresh: (cb) => ipcRenderer.on('popup:refresh', () => cb()),
   onCliProgress: (cb) => ipcRenderer.on('usage:cliProgress', (_e, data) => cb(data)),
 

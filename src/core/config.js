@@ -42,6 +42,28 @@ const DEFAULTS = {
   apiPrompted: false,
   apiTokens: {},
 
+  // Claude Code status line. The app writes a script and a `statusLine` entry
+  // into ~/.claude/settings.json; Claude Code then shows usage in the terminal.
+  // Entirely local — the script reads the JSON Claude Code hands it and the
+  // figures this app already has.
+  //   statuslineSegments: which parts are shown, in this order
+  //   statuslineColor:    multi | mono | none
+  //   statuslineBridge:   let the script report exact rate limits back
+  //   statuslinePrev:     a foreign statusLine we replaced, restored on removal
+  statuslineEnabled: false,
+  statuslineSegments: ['dir', 'git', 'model', 'profile', 'usage', 'bar', 'reset'],
+  statuslineColor: 'multi',
+  statuslineLabels: true,
+  statuslineAscii: false,
+  statuslinePace: true,
+  statuslineRefreshSec: 30,
+  statuslineBridge: true,
+  statuslinePrev: null,
+
+  // When the active profile last changed. Rate limits captured by the status
+  // line before that moment belonged to the previous account.
+  lastSwitchAt: 0,
+
   // Manual override for the Claude install: { kind: 'store', appId } | { kind: 'exe', path }
   claudeApp: null,
   windowBounds: null,
@@ -95,11 +117,13 @@ function set(patch) {
 function reset() {
   // Window geometry, accepted consent and learned reset anchors survive a reset.
   // Tokens and the API opt-in are cleared — resetting settings should not silently
-  // keep a live-usage connection running.
+  // keep a live-usage connection running. A status line configuration that this
+  // app replaced is kept so that removing ours can still put the original back.
   return set(Object.assign({}, DEFAULTS, {
     windowBounds: data.windowBounds,
     consentVersion: data.consentVersion,
     weeklyAnchors: data.weeklyAnchors,
+    statuslinePrev: data.statuslinePrev,
   }));
 }
 

@@ -28,6 +28,24 @@ and no analytics, with the feature on or off.
 Enabling it for several accounts at once means authenticated requests for multiple
 accounts from one machine. That is your decision to make; the setting says so plainly.
 
+## Files the app writes outside its own storage
+
+One feature writes outside profile storage and the app's own data directory: the
+**status line** (Settings → Status line), off by default.
+
+Turning it on adds a `statusLine` entry to `~/.claude/settings.json` pointing at a
+PowerShell script the app writes into its own data directory, and leaves every other key
+in that file untouched. A status line you had configured before is remembered and put
+back when the feature is turned off. If the file cannot be parsed, the app refuses to
+write it rather than replacing it.
+
+The script itself reads the JSON Claude Code hands it on stdin, plus a state file the app
+writes, and prints one line. It makes no network request. With **Record the rate limits
+Claude Code reports** on, it also writes the percentages and reset times Claude Code was
+given into `bridge.json` in the app's data directory, so the app can show exact figures
+without asking the API itself. That file holds usage percentages, reset timestamps and an
+organization id — no tokens.
+
 ## What the app does not do
 
 - No credentials are parsed or displayed beyond the single token field described above.

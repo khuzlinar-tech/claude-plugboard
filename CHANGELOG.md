@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0]
+
+### Added
+
+- **A status line for Claude Code.** Settings → Status line installs a script into
+  `~/.claude/settings.json` that shows the account, the 5-hour and weekly usage, a
+  progress bar with a pace marker and the reset countdown at the bottom of the terminal.
+  The parts shown, the colours, the labels and the refresh timer are all configurable,
+  and the preview in Settings is the real script's output rather than an imitation. A
+  status line you already had is remembered and restored when the feature is turned off.
+- **Exact reset times without any network request.** Claude Code is told the exact
+  percentages and reset moments by the API and passes them to whatever draws the status
+  line — so with the status line installed, the app records them and uses them. That
+  makes the weekly reset exact for accounts where it was previously an estimate, and it
+  costs nothing: no token, no request, no account of ours involved.
+- **Live countdowns.** Reset timers in the Limits view and the tray panel now tick, down
+  to seconds inside the last hour, and reload the figures the moment a window rolls over.
+- **Pace.** A marker on each gauge and meter shows how much of the window has already
+  elapsed; a caption states where the current rate lands — "at this rate ≈72% by the
+  reset", or the time the limit runs out if it will. It says nothing until enough of the
+  window has passed for the rate to mean anything.
+
+### Fixed
+
+- Weekly limit notifications never fired: the code identified the window by a field that
+  does not exist on the weekly window, so the threshold check was skipped every time.
+- A stale sample file no longer suppresses notifications when exact figures are available
+  from Claude Code or the API.
+
 ## [1.5.0]
 
 ### Added

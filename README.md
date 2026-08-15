@@ -41,9 +41,14 @@ the cookies and the Claude Code credentials all come back exactly as you left th
   and starts it again. Every move is journalled and rolled back if something fails halfway.
 - **Account details** — plan (Pro / Max 5x / Max 20x), rate-limit tier, billing method,
   subscription date, organization, extra-usage flag. Shown for inactive profiles too.
-- **Rate limits** — current 5-hour and weekly usage, estimated reset time, history chart with
-  gaps where Claude was closed, daily peaks, and a side-by-side comparison of every profile.
+- **Rate limits** — current 5-hour and weekly usage, reset time with a live countdown,
+  history chart with gaps where Claude was closed, daily peaks, and a side-by-side
+  comparison of every profile.
+- **Pace** — a marker showing how much of the window has elapsed against how much of it you
+  have spent, and where the current rate lands by the reset.
 - **Claude Code usage** — token totals from local transcripts, by day, model and project.
+- **Status line in the terminal** — usage, pace and countdown inside Claude Code itself.
+  Optional, configurable, and the source of exact reset times. See below.
 - **Tray icon** — a panel with the active account, usage meters and one-click switching.
   The icon itself can show the percentage as a bar, a number or a battery.
 - **Installed Claude Code versions** — desktop bundle, npm CLI and editor extensions.
@@ -63,12 +68,17 @@ Usage percentages read from disk are exact — they are the same numbers Claude 
 "resets by 18:42" rather than inventing a precise time, and says so plainly when a
 weekly reset has never been observed.
 
-Two ways to get exact reset times:
+Three ways to get exact reset times:
 
-1. **Calibration** (no network). Claude's own usage view states the weekly reset, e.g.
+1. **The status line** (no network, recommended). Anthropic's API tells Claude Code the
+   exact percentages and reset moments, and Claude Code passes them to whatever draws its
+   status line. Install the status line below and the app records them and uses them —
+   no token, no request, nothing of ours in the middle. Works for Pro and Max accounts,
+   from the first reply in a Claude Code session.
+2. **Calibration** (no network). Claude's own usage view states the weekly reset, e.g.
    "Resets Wed 7:00 AM". Enter that once — the whole string works — and it is exact from
    then on. The app also learns the anchor by itself the first time it observes a reset.
-2. **Live usage** (opt-in, makes network requests). Reads the OAuth token Claude Code
+3. **Live usage** (opt-in, makes network requests). Reads the OAuth token Claude Code
    stored locally and asks `api.anthropic.com/api/oauth/usage` for the exact figures.
    Off by default, asked about once at first run, and limited to the active profile
    unless you widen it. Only works for profiles signed into Claude Code; otherwise the
@@ -121,6 +131,33 @@ and journals every move so a mid-way failure is rolled back rather than left hal
 an organization id, so one shared file holds the limit history of all accounts — which is
 exactly what makes comparing them possible.
 
+## Status line in the terminal
+
+Claude Code can draw a line of your own at the bottom of the terminal. **Settings → Status
+line** installs one:
+
+```
+claude-profile-manager │ ⎇ main │ Opus │ work │ Usage: 24% ██░░░░░┃░░ │ Reset: 20:56 (1h 06m)
+```
+
+Directory, git branch, model, which account this app has active, context window, 5-hour and
+weekly usage, a ten-cell bar with the pace marker, the reset countdown and Claude Code's own
+session cost — each one can be switched off, and so can the colours, the labels and the
+refresh timer. The preview in Settings is the actual script's output, not a mock-up.
+
+![Status line settings](docs/screenshot-statusline.png)
+
+It is a PowerShell script in the app's data directory plus a `statusLine` entry in
+`~/.claude/settings.json`; every other key in that file is left alone, and a status line you
+already had is remembered and put back when you turn this off. The script reads the JSON
+Claude Code hands it and a state file the app writes. It makes no network request, and it
+works whether or not the app is running.
+
+**This is also where exact figures come from.** Claude Code receives the real percentages
+and reset moments with its API responses and passes them to the status line, which records
+them for the app. That is the whole trick: exact resets with no request of our own. It is
+per-account, and only appears once a Claude Code session has had a reply.
+
 ### Beyond the desktop app
 
 Claude Code — the CLI and the editor extensions — authenticates through `~/.claude`, which is
@@ -129,7 +166,8 @@ only* or *Claude Code only* if you want the two to stay independent.
 
 ## Where the data comes from
 
-Everything is read from files Claude itself maintains. Nothing is fetched from the network.
+Everything is read from files on this machine. Nothing is fetched from the network unless
+you turn on live usage.
 
 | Source | Used for |
 |---|---|
@@ -137,6 +175,7 @@ Everything is read from files Claude itself maintains. Nothing is fetched from t
 | `~/.claude-profiles/<slot>/home_.claude.json` | the same, for profiles that are not active |
 | `%APPDATA%\Claude\plan-usage-history.json` | 5-hour and weekly usage percentages over time |
 | `~/.claude/projects/**/*.jsonl` | Claude Code tokens per day, model and project |
+| `statusline/bridge.json` in the app's data directory | exact percentages and reset times, recorded by the status line |
 
 Reset times are derived from the last time a counter dropped to zero, so they are estimates
 rather than official dates. Claude Code totals cover every account, because
@@ -164,9 +203,14 @@ src/
     claudeApp.js       detect / launch / close Claude Desktop, detect Claude Code
     profiles.js        read profiles, switch with rollback, slot management
     usage.js           parse plan-usage-history.json, limit windows, reset estimates
+    pace.js            elapsed vs spent, and where the current rate lands
     cliusage.js        aggregate Claude Code tokens, cached by mtime + size
+    statusline.js      install, configure and preview the Claude Code status line
+    trayIcon.js        the tray icon drawn from raw pixels
+    versions.js        which Claude Code builds are installed
+  statusline/          the PowerShell script copied out to the user's machine
   i18n/                one file per language, en.js is the source of truth
-  renderer/            main, settings and consent windows; charts are inline SVG
+  renderer/            main, settings, tray panel and consent windows; charts are inline SVG
 tools/make-icon.js     icon generator built on zlib alone
 ```
 

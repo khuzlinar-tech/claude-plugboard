@@ -22,17 +22,22 @@ const esc = (s) =>
 const fmtTime = (v) => new Date(v).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 const fmtDateTime = (v) => new Date(v).toLocaleString(LOCALE, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 
-function fmtDuration(ms) {
+/** Ticking countdown: seconds matter inside the last hour, and only there. */
+function fmtCountdown(ms) {
   if (ms == null || ms < 0) return '';
   const unit = (v, n) => new Intl.NumberFormat(LOCALE, { style: 'unit', unit: n, unitDisplay: 'short' }).format(v);
-  const m = Math.round(ms / 60000);
-  if (m < 60) return unit(m, 'minute');
-  const h = Math.floor(m / 60);
-  if (h < 24) {
-    const rest = m % 60;
-    return rest ? `${unit(h, 'hour')} ${unit(rest, 'minute')}` : unit(h, 'hour');
+
+  const total = Math.floor(ms / 1000);
+  const days = Math.floor(total / 86400);
+  if (days >= 1) {
+    const hours = Math.floor((total % 86400) / 3600);
+    return hours ? `${unit(days, 'day')} ${unit(hours, 'hour')}` : unit(days, 'day');
   }
-  return unit(Math.floor(h / 24), 'day');
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours >= 1) return minutes ? `${unit(hours, 'hour')} ${unit(minutes, 'minute')}` : unit(hours, 'hour');
+  const seconds = total % 60;
+  return minutes ? `${unit(minutes, 'minute')} ${unit(seconds, 'second')}` : unit(seconds, 'second');
 }
 
 function usageColor(pct) {
@@ -47,37 +52,61 @@ function applyTheme(payload) {
   document.documentElement.dataset.theme = payload && payload.dark === false ? 'light' : 'dark';
 }
 
-/** One labelled progress row: percentage, bar, and the reset caption. */
-function meter(label, pct, caption, color, tag) {
+// Marks where the ticking countdown goes; an invisible separator survives
+// escaping, which a placeholder like {dur} would not.
+const CD = '⁣';
+
+/**
+ * One labelled progress row: percentage, bar with the pace marker at the
+ * elapsed fraction of the window, and the reset caption.
+ */
+function meter(label, pct, caption, color, pace) {
+  const mark =
+    pace && pace.elapsed != null
+      ? `<b class="pace-mark" style="left:${(Math.max(0, Math.min(1, pace.elapsed)) * 100).toFixed(1)}%"></b>`
+      : '';
   return `<div class="meter">
     <div class="meter-top">
       <span class="meter-label">${esc(label)}</span>
       <span class="meter-pct">${pct}%</span>
     </div>
-    <div class="meter-track"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:${color}"></i></div>
-    ${caption ? `<div class="meter-sub">${esc(caption)}${tag ? ` <span class="src-tag">${esc(tag)}</span>` : ''}</div>` : ''}
+    <div class="meter-track"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:${color}"></i>${mark}</div>
+    ${caption ? `<div class="meter-sub">${captionHtml(caption)}</div>` : ''}
   </div>`;
 }
 
-function fhCaption(u, api) {
-  const exact = api && api.fiveHour && api.fiveHour.resetAt;
-  if (exact) {
-    const d = exact - Date.now();
-    return { text: d > 0 ? t('lim.resetExactIn', { when: fmtDateTime(exact), dur: fmtDuration(d) }) : t('lim.resetExact', { when: fmtDateTime(exact) }), tag: t('lim.viaApi') };
+function captionHtml(c) {
+  if (!c || !c.text) return '';
+  let html = esc(c.text);
+  if (c.until) {
+    html = html.replace(CD, `<span class="cd" data-until="${c.until}">${esc(fmtCountdown(c.until - Date.now()))}</span>`);
   }
-  if (!u.fiveHour.known) return { text: t('lim.notStarted'), tag: null };
-  return {
-    text: t('lim.resetBefore', { time: fmtTime(u.fiveHour.resetBefore), dur: fmtDuration(u.fiveHour.resetBefore - Date.now()) }),
-    tag: null,
-  };
+  return `${html}${c.tag ? ` <span class="src-tag">${esc(c.tag)}</span>` : ''}`;
 }
 
-function sdCaption(u, api) {
-  const exact = api && api.weekly && api.weekly.resetAt;
-  if (exact) return { text: t('lim.resetExact', { when: fmtDateTime(exact) }), tag: t('lim.viaApi') };
-  if (!u.weekly.known) return { text: t('lim.resetUnknown'), tag: null };
-  if (u.weekly.exact) return { text: t('lim.resetExact', { when: fmtDateTime(u.weekly.resetAt) }), tag: null };
-  return { text: t('lim.resetBeforeAt', { when: fmtDateTime(u.weekly.resetAt) }), tag: null };
+function sourceTag(source) {
+  if (source === 'code') return t('lim.viaCode');
+  if (source === 'api') return t('lim.viaApi');
+  return null;
+}
+
+function fhCaption(u) {
+  const e = u.exact && u.exact.fh;
+  if (e && e.resetAt) {
+    return { text: t('lim.resetExactIn', { when: fmtDateTime(e.resetAt), dur: CD }), tag: sourceTag(e.source), until: e.resetAt };
+  }
+  if (!u.fiveHour.known) return { text: t('lim.notStarted') };
+  return { text: t('lim.resetBefore', { time: fmtTime(u.fiveHour.resetBefore), dur: CD }), until: u.fiveHour.resetBefore };
+}
+
+function sdCaption(u) {
+  const e = u.exact && u.exact.sd;
+  if (e && e.resetAt) {
+    return { text: t('lim.resetExactIn', { when: fmtDateTime(e.resetAt), dur: CD }), tag: sourceTag(e.source), until: e.resetAt };
+  }
+  if (!u.weekly.known) return { text: t('lim.resetUnknown') };
+  if (u.weekly.exact) return { text: t('lim.resetExactIn', { when: fmtDateTime(u.weekly.resetAt), dur: CD }), until: u.weekly.resetAt };
+  return { text: t('lim.resetBeforeAt', { when: fmtDateTime(u.weekly.resetAt) }) };
 }
 
 function render() {
@@ -89,7 +118,6 @@ function render() {
 
   const active = data.profiles.find((p) => p.isActive) || null;
   const u = active && active.org ? data.orgs[active.org] : null;
-  const api = active && active.org && data.api[active.org] && data.api[active.org].ok ? data.api[active.org] : null;
 
   const account = active
     ? `<div class="popup-sec">${esc(t('ov.account'))}</div>
@@ -98,18 +126,17 @@ function render() {
        ${active.plan ? `<div class="popup-row"><span>${esc(t('ov.plan'))}</span><b>${esc(active.plan)}</b></div>` : ''}`
     : `<div class="popup-empty">${esc(t('tray.noProfile'))}</div>`;
 
+  const pace = (u && u.pace) || {};
   const usage = u
     ? `<div class="popup-sec">${esc(t('ov.limits'))}</div>
        ${(() => {
-         const c = fhCaption(u, api);
-         const v = api && api.fiveHour ? api.fiveHour.value : u.latest.fh;
-         return meter(t('lim.fh'), v, c.text, usageColor(v), c.tag);
+         const v = u.exact && u.exact.fh ? u.exact.fh.value : u.latest.fh;
+         return meter(t('lim.fh'), v, fhCaption(u), usageColor(v), pace.fh);
        })()}
        ${(() => {
-         const c = sdCaption(u, api);
-         const v = api && api.weekly ? api.weekly.value : u.latest.sd;
+         const v = u.exact && u.exact.sd ? u.exact.sd.value : u.latest.sd;
          const cs = getComputedStyle(document.documentElement);
-         return meter(t('lim.sd'), v, c.text, (cs.getPropertyValue('--blue') || '#7ba7d7').trim(), c.tag);
+         return meter(t('lim.sd'), v, sdCaption(u), (cs.getPropertyValue('--blue') || '#7ba7d7').trim(), pace.sd);
        })()}`
     : `<div class="popup-sec">${esc(t('ov.limits'))}</div><div class="popup-empty">${esc(t('ov.noSamples'))}</div>`;
 
@@ -191,6 +218,24 @@ async function init() {
   window.api.onThemeChanged(applyTheme);
   window.api.onClaudeState(() => load());
   window.api.onUsageChanged(() => load());
+
+  // One shared tick drives every countdown; a window running out reloads the
+  // panel, because the figures behind it are stale the moment it does.
+  setInterval(() => {
+    const now = Date.now();
+    let expired = false;
+    $$('[data-until]').forEach((el) => {
+      const left = Number(el.dataset.until) - now;
+      if (left > 0) {
+        el.textContent = fmtCountdown(left);
+        return;
+      }
+      el.textContent = t('lim.resetNow');
+      el.removeAttribute('data-until');
+      expired = true;
+    });
+    if (expired) load();
+  }, 1000);
 
   load();
 }

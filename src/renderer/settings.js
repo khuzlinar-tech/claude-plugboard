@@ -3,7 +3,7 @@
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-const S = { tab: 'general', cfg: null, info: null, claude: null, state: null, langs: [], tokens: [] };
+const S = { tab: 'general', cfg: null, info: null, claude: null, state: null, langs: [], tokens: [], statusline: null };
 
 /** Per-profile token availability, for the live-usage section. */
 async function loadTokens() {
@@ -106,6 +106,7 @@ function render() {
 
   if (S.tab === 'general') renderGeneral(pane);
   else if (S.tab === 'claude') renderClaude(pane);
+  else if (S.tab === 'statusline') renderStatusline(pane);
   else if (S.tab === 'paths') renderPaths(pane);
   else renderAbout(pane);
 
@@ -305,6 +306,98 @@ function renderClaude(pane) {
     </div>`;
 }
 
+/* The status line Claude Code draws in the terminal. */
+
+const SL_SEGMENTS = ['dir', 'git', 'model', 'profile', 'context', 'usage', 'bar', 'weekly', 'reset', 'cost'];
+
+function renderStatusline(pane) {
+  const sl = S.statusline || {};
+  const chosen = S.cfg.statuslineSegments || [];
+
+  const segments = SL_SEGMENTS.map(
+    (id) => `<label class="row row-pick">
+      <div class="row-text">
+        <div class="row-t">${esc(t(`sl.seg.${id}`))}</div>
+        <div class="row-h">${esc(t(`sl.segHint.${id}`))}</div>
+      </div>
+      <span class="switch">
+        <input type="checkbox" data-cfg-set="statuslineSegments" value="${esc(id)}" ${chosen.includes(id) ? 'checked' : ''}>
+        <i></i>
+      </span>
+    </label>`
+  ).join('');
+
+  // What the terminal will actually show: the installed script, run exactly as
+  // Claude Code runs it. Colours are stripped, since this is not a terminal.
+  const preview = `<div class="sl-preview mono" id="slPreview">${esc(t('common.loading'))}</div>`;
+
+  let state = t('sl.stateOff');
+  let stateClass = '';
+  if (sl.installed) state = t('sl.stateOn');
+  else if (sl.foreign) {
+    state = t('sl.stateForeign', { command: String(sl.foreign.command || '').slice(0, 60) });
+    stateClass = 'token-warn';
+  } else if (sl.broken) {
+    state = t('sl.stateBroken');
+    stateClass = 'token-warn';
+  }
+
+  pane.innerHTML =
+    section(
+      t('sl.title'),
+      `<div class="row-h" style="margin-bottom:12px">${esc(t('sl.intro'))}</div>` +
+        toggle('statuslineEnabled', t('sl.enable'), t('sl.enableHint')) +
+        `<div class="row"><div class="row-text">
+           <div class="row-t">${esc(t('sl.state'))}</div>
+           <div class="row-h ${stateClass}">${esc(state)}</div>
+         </div></div>` +
+        preview +
+        `<div class="head-actions" style="margin-top:10px">
+           <button class="btn btn-sm" data-act="slPreview">${esc(t('sl.refreshPreview'))}</button>
+           <button class="btn btn-sm" data-act="slReinstall">${esc(t('sl.reinstall'))}</button>
+           <button class="btn btn-sm" data-open="statuslineDir">${esc(t('sl.openFolder'))}</button>
+         </div>`
+    ) +
+    section(t('sl.segments'), segments) +
+    section(
+      t('sl.look'),
+      selectRow(
+        'statuslineColor',
+        t('sl.color'),
+        ['multi', 'mono', 'none'].map((v) => ({ value: v, label: t(`sl.color.${v}`) }))
+      ) +
+        toggle('statuslineLabels', t('sl.labels'), t('sl.labelsHint')) +
+        toggle('statuslinePace', t('sl.pace'), t('sl.paceHint')) +
+        toggle('statuslineAscii', t('sl.ascii'), t('sl.asciiHint')) +
+        numberRow('statuslineRefreshSec', t('sl.refresh'), 0, 300) +
+        `<div class="row-h">${esc(t('sl.refreshHint'))}</div>`
+    ) +
+    section(
+      t('sl.exact'),
+      toggle('statuslineBridge', t('sl.bridge'), t('sl.bridgeHint')) +
+        `<div class="row-h" style="margin-top:10px">${esc(t('sl.exactHint'))}</div>` +
+        (sl.bridge && sl.bridge.length
+          ? `<div class="row-h" style="margin-top:8px">${esc(t('sl.bridgeSeen', { n: sl.bridge.length }))}</div>`
+          : `<div class="row-h" style="margin-top:8px">${esc(t('sl.bridgeNone'))}</div>`)
+    );
+
+  loadPreview();
+}
+
+/** Asks the main process to run the script and shows what it printed. */
+async function loadPreview() {
+  const box = $('#slPreview');
+  if (!box) return;
+  try {
+    const res = await window.api.statusline.preview();
+    if (!box.isConnected) return;
+    if (res.ok && res.lines.length) box.textContent = res.lines.join('\n');
+    else box.textContent = res.ok ? t('sl.previewEmpty') : t(`err.${res.code}`, { detail: res.detail });
+  } catch (err) {
+    box.textContent = err.message;
+  }
+}
+
 function renderPaths(pane) {
   const p = S.state.paths;
   const sw = S.state.switched;
@@ -316,7 +409,9 @@ function renderPaths(pane) {
         pathRow(t('set.claudeAppData'), p.claudeAppData, 'claudeAppData') +
         pathRow(t('set.usageHistory'), p.usageHistory, null) +
         pathRow(t('set.projectsDir'), p.projectsDir, 'projectsDir') +
-        pathRow(t('set.settingsFile'), p.settingsFile, 'settingsFile')
+        pathRow(t('set.settingsFile'), p.settingsFile, 'settingsFile') +
+        pathRow(t('set.statuslineDir'), p.statuslineDir, 'statuslineDir') +
+        pathRow(t('set.claudeSettings'), p.claudeSettings, null)
     ) +
     section(
       t('set.switched'),
@@ -414,6 +509,20 @@ function wire(pane) {
     })
   );
 
+  // A checkbox group that adds up to one array setting, kept in a fixed order
+  // so the status line reads the same way however the boxes were ticked.
+  $$('[data-cfg-set]', pane).forEach((el) =>
+    el.addEventListener('change', async () => {
+      const key = el.dataset.cfgSet;
+      const picked = $$(`[data-cfg-set="${key}"]`, pane)
+        .filter((box) => box.checked)
+        .map((box) => box.value);
+      S.cfg = await window.api.config.set({ [key]: picked });
+      loadPreview();
+      toast(t('toast.saved'), 'ok');
+    })
+  );
+
   $$('[data-open]', pane).forEach((el) => el.addEventListener('click', () => window.api.openPath(el.dataset.open)));
   $$('[data-ext]', pane).forEach((el) => el.addEventListener('click', () => window.api.openExternal(el.dataset.ext)));
 
@@ -494,6 +603,18 @@ function wire(pane) {
           await window.api.openClaudeTerminal();
           return;
 
+        case 'slPreview':
+          loadPreview();
+          return;
+
+        case 'slReinstall': {
+          const res = await window.api.statusline.reinstall();
+          S.statusline = await window.api.statusline.status();
+          render();
+          toast(res.ok ? t('toast.saved') : t(`err.${res.code}`, { detail: res.detail }), res.ok ? 'ok' : 'err');
+          return;
+        }
+
         case 'recheckTokens':
           await loadTokens();
           render();
@@ -537,12 +658,13 @@ async function init() {
   LOCALE = payload.locale;
   applyStaticI18n();
 
-  [S.cfg, S.info, S.claude, S.state, S.langs] = await Promise.all([
+  [S.cfg, S.info, S.claude, S.state, S.langs, S.statusline] = await Promise.all([
     window.api.config.get(),
     window.api.getInfo(),
     window.api.detectClaude(),
     window.api.getState(),
     window.api.languages(),
+    window.api.statusline.status(),
   ]);
   await loadTokens();
 
@@ -563,6 +685,11 @@ async function init() {
   window.api.onThemeChanged(applyTheme);
   window.api.onConfigChanged((cfg) => {
     S.cfg = cfg;
+  });
+  window.api.onStatuslineChanged(async (res) => {
+    S.statusline = await window.api.statusline.status();
+    if (S.tab === 'statusline') render();
+    if (res && !res.ok) toast(t(`err.${res.code}`, { detail: res.detail }), 'err');
   });
 
   render();

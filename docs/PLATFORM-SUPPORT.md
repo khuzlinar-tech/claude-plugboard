@@ -13,6 +13,18 @@ signed by Apple, and actively maintained.
 There is no reason for a second, worse macOS implementation. This project stays on
 Windows, that one stays on macOS, and the feature sets converge.
 
+## Where the two stand
+
+Taking Claude-Usage-Tracker as the reference, this app now covers the session and weekly
+windows, multiple profiles with switching, threshold notifications, icon styles and
+colour modes, the pace marker, live countdowns and the Claude Code status line — and adds
+account-level detail and Claude Code token history, which the reference does not have.
+
+Still only there: per-model breakdowns (Opus / Sonnet / Fable separately), API console
+spend with per-key costs, extra-usage spend, service health from `status.claude.com`, and
+automatically switching profiles when a limit is hit. The first three need API responses
+this app does not request by default; the last is deliberately out of scope.
+
 ## Why not just port this app
 
 The app moves the files that constitute a signed-in Claude session. Reading the wrong

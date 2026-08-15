@@ -1,7 +1,7 @@
 {
   "name": "claude-profile-manager",
   "productName": "Claude Profile Manager",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Switch between multiple Claude accounts on Windows and see the plan, subscription and rate-limit usage of each one.",
   "keywords": [
     "claude",
@@ -13,6 +13,8 @@
     "profile-manager",
     "multi-account",
     "rate-limit",
+    "statusline",
+    "claude-code-statusline",
     "usage-dashboard",
     "token-usage",
     "electron",
