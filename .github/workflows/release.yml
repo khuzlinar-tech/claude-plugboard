@@ -27,10 +27,11 @@ jobs:
       - name: Generate icons
         run: npm run icon
 
+      # --publish never: electron-builder would otherwise upload the artifacts
+      # itself when a GH token is present, and the release step below would add
+      # a second, differently named copy of every file.
       - name: Build installer and portable
-        run: npm run build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build -- --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
