@@ -6,6 +6,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const S = {
   state: null,
   plan: null,
+  api: {},
   cli: null,
   cliLoading: false,
   selected: null,
@@ -80,21 +81,24 @@ function fmtDay(day) {
   return new Date(`${day}T12:00:00`).toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit' });
 }
 
+/**
+ * A bare duration such as "1 hr 6 min" / "1 ч 6 мин".
+ * Deliberately not RelativeTimeFormat: that produces "in 1 hr" / "через 1 ч",
+ * and the surrounding sentence already supplies its own preposition.
+ */
 function fmtDuration(ms) {
   if (ms == null || ms < 0) return DASH;
-  const rtf = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'always', style: 'short' });
+  const unit = (value, name) =>
+    new Intl.NumberFormat(LOCALE, { style: 'unit', unit: name, unitDisplay: 'short' }).format(value);
+
   const m = Math.round(ms / 60000);
-  if (m < 60) return rtf.formatToParts(m, 'minute').map((p) => p.value).join('').replace(/^in\s+/i, '').trim();
+  if (m < 60) return unit(m, 'minute');
   const h = Math.floor(m / 60);
   if (h < 24) {
-    const head = rtf.formatToParts(h, 'hour').map((p) => p.value).join('').replace(/^in\s+/i, '').trim();
     const rest = m % 60;
-    if (!rest) return head;
-    const tail = rtf.formatToParts(rest, 'minute').map((p) => p.value).join('').replace(/^in\s+/i, '').trim();
-    return `${head} ${tail}`;
+    return rest ? `${unit(h, 'hour')} ${unit(rest, 'minute')}` : unit(h, 'hour');
   }
-  const d = Math.floor(h / 24);
-  return rtf.formatToParts(d, 'day').map((p) => p.value).join('').replace(/^in\s+/i, '').trim();
+  return unit(Math.floor(h / 24), 'day');
 }
 
 function relTime(ts) {
@@ -188,7 +192,7 @@ async function loadDict() {
   applyStaticI18n();
 }
 
-async function refresh({ silent } = {}) {
+async function refresh({ silent, forceApi } = {}) {
   if (!silent) $('#btnRefresh').classList.add('spin');
   try {
     const [state, plan] = await Promise.all([window.api.getState(), window.api.planUsage()]);
@@ -199,11 +203,32 @@ async function refresh({ silent } = {}) {
     }
     paintClaudeState(state.claude);
     render();
+
+    // Live usage, if enabled, arrives after the local view is already up.
+    if (state.config && state.config.apiMode !== 'off') {
+      window.api
+        .apiUsage(!!forceApi)
+        .then((r) => {
+          S.api = (r && r.results) || {};
+          render();
+        })
+        .catch(() => {});
+    } else {
+      S.api = {};
+    }
   } catch (err) {
     toast(t('toast.loadFailed', { msg: err.message }), 'err');
   } finally {
     $('#btnRefresh').classList.remove('spin');
   }
+}
+
+/** Live API result for a profile's org, when present and successful. */
+function apiFor(profile) {
+  const org = profile && profile.account && profile.account.organizationUuid;
+  if (!org || !S.api) return null;
+  const r = S.api[org];
+  return r && r.ok ? r : null;
 }
 
 function paintClaudeState(st) {
@@ -378,7 +403,7 @@ function renderOverview(pane, p) {
 
       <div class="card">
         <h2>${esc(t('ov.limits'))}</h2>
-        ${u ? gaugesHtml(u) : `<div class="muted" style="padding:8px 0">${esc(t('ov.noSamples'))}</div>`}
+        ${u ? gaugesHtml(u, apiFor(p)) : `<div class="muted" style="padding:8px 0">${esc(t('ov.noSamples'))}</div>`}
         ${
           u
             ? `<div class="gauge-sub" style="margin-top:14px">
@@ -418,13 +443,45 @@ function gaugeSvg(pct, color) {
   </svg>`;
 }
 
-function gaugesHtml(u) {
-  const fh = u.latest.fh;
-  const sd = u.latest.sd;
-  const fhReset = u.fiveHour.resetAt
-    ? t('lim.resetIn', { dur: fmtDuration(u.fiveHour.resetAt - Date.now()), time: fmtTime(u.fiveHour.resetAt) })
-    : t('lim.notStarted');
-  const sdReset = u.weekly.resetAt ? t('lim.resetAt', { when: fmtDateTime(u.weekly.resetAt) }) : t('lim.noReset');
+/**
+ * Reset caption for the 5-hour window (estimate has resetBefore + known).
+ */
+function fhCaption(fh, api) {
+  const exact = api && api.fiveHour && api.fiveHour.resetAt;
+  if (exact) {
+    const dur = exact - Date.now();
+    return {
+      text: dur > 0 ? t('lim.resetExactIn', { when: fmtDateTime(exact), dur: fmtDuration(dur) }) : t('lim.resetExact', { when: fmtDateTime(exact) }),
+      tag: t('lim.viaApi'),
+    };
+  }
+  if (!fh.known) return { text: t('lim.notStarted'), tag: null };
+  return {
+    text: t('lim.resetBefore', { time: fmtTime(fh.resetBefore), dur: fmtDuration(fh.resetBefore - Date.now()) }),
+    tag: null,
+  };
+}
+
+/**
+ * Reset caption for the weekly window (estimate has resetAt + known + exact).
+ * Priority: API exact → calibrated/observed exact → upper-bound → unknown.
+ */
+function sdCaption(sd, api) {
+  const exact = api && api.weekly && api.weekly.resetAt;
+  if (exact) return { text: t('lim.resetExact', { when: fmtDateTime(exact) }), tag: t('lim.viaApi') };
+  if (!sd.known) return { text: t('lim.resetUnknown'), tag: null };
+  if (sd.exact) return { text: t('lim.resetExact', { when: fmtDateTime(sd.resetAt) }), tag: null };
+  return { text: t('lim.resetBeforeAt', { when: fmtDateTime(sd.resetAt) }), tag: null };
+}
+
+function captionHtml(c) {
+  if (!c.text) return '';
+  return `${esc(c.text)}${c.tag ? ` <span class="src-tag">${esc(c.tag)}</span>` : ''}`;
+}
+
+function gaugesHtml(u, api) {
+  const fh = api && api.fiveHour ? api.fiveHour.value : u.latest.fh;
+  const sd = api && api.weekly ? api.weekly.value : u.latest.sd;
 
   return `<div class="gauges">
     <div class="gauge">
@@ -432,7 +489,7 @@ function gaugesHtml(u) {
       <div>
         <div class="gauge-label">${esc(t('lim.fh'))}</div>
         <div class="gauge-value">${fh}<small>%</small></div>
-        <div class="gauge-sub">${esc(fhReset)}</div>
+        <div class="gauge-sub">${captionHtml(fhCaption(u.fiveHour, api))}</div>
       </div>
     </div>
     <div class="gauge">
@@ -440,9 +497,23 @@ function gaugesHtml(u) {
       <div>
         <div class="gauge-label">${esc(t('lim.sd'))}</div>
         <div class="gauge-value">${sd}<small>%</small></div>
-        <div class="gauge-sub">${esc(sdReset)}</div>
+        <div class="gauge-sub">${captionHtml(sdCaption(u.weekly, api))}</div>
       </div>
     </div>
+  </div>`;
+}
+
+/** When API mode is on but a profile's fetch failed, show why plus a token action. */
+function apiErrorHtml(p) {
+  if (!S.state.config || S.state.config.apiMode === 'off') return '';
+  const org = p.account && p.account.organizationUuid;
+  const r = org && S.api ? S.api[org] : null;
+  if (!r || r.ok) return '';
+  const canPaste = r.code === 'API_NO_TOKEN' || r.code === 'API_TOKEN_EXPIRED' || r.code === 'API_UNAUTHORIZED';
+  return `<div class="note" style="margin:14px 0 0">
+    <div>${esc(errorText(r))}${
+      canPaste ? ` <a href="#" data-act="pasteToken" data-slot="${esc(p.slot)}" class="link">${esc(t('set.apiTokenEnter'))}</a>` : ''
+    }</div>
   </div>`;
 }
 
@@ -472,7 +543,12 @@ function renderLimits(pane, p) {
 
     ${
       u
-        ? `<div class="card">${gaugesHtml(u)}</div>
+        ? `<div class="card">${gaugesHtml(u, apiFor(p))}
+      <div class="head-actions" style="margin-top:14px">
+        <button class="btn btn-sm btn-ghost" data-act="calibrate" data-slot="${esc(p.slot)}">${esc(t('lim.calibrate'))}</button>
+      </div>
+      ${apiErrorHtml(p)}
+    </div>
 
     <div class="card">
       <div class="card-head">
@@ -535,6 +611,7 @@ function renderLimits(pane, p) {
       render();
     })
   );
+  wireActions(pane);
 
   if (u) {
     drawUsageChart($('#chartWrap'), u.series, S.range);
@@ -895,6 +972,14 @@ async function handleAction(d) {
       loadCli();
       return;
 
+    case 'calibrate':
+      await calibrateWeekly(S.state.profiles.find((x) => x.slot === d.slot));
+      return;
+
+    case 'pasteToken':
+      await pasteToken(S.state.profiles.find((x) => x.slot === d.slot));
+      return;
+
     case 'adopt': {
       const created = await ui.prompt({
         title: t('onb.title'),
@@ -947,6 +1032,90 @@ async function handleAction(d) {
       refresh({ silent: true });
     }
   }
+}
+
+/**
+ * Turns a "weekday HH:MM" entry into the most recent past moment matching it,
+ * which the core then rolls forward in whole weeks. Accepts a localized weekday
+ * name (any reasonable prefix) or a 0–6 index, plus a time.
+ */
+function parseWeeklyReset(input) {
+  const raw = String(input || '').trim().toLowerCase();
+  if (!raw) return null;
+  const timeM = raw.match(/(\d{1,2})[:.\s](\d{2})/);
+  const hour = timeM ? Math.min(23, +timeM[1]) : 0;
+  const min = timeM ? Math.min(59, +timeM[2]) : 0;
+
+  // Match whole words only. Substring matching would let a two-letter
+  // abbreviation ("чт") hit inside an unrelated word ("нечто").
+  const words = raw.split(/[^\p{L}]+/u).filter((w) => w.length >= 2);
+  let dow = null;
+  for (let d = 0; d < 7 && dow == null; d++) {
+    const ref = new Date(2026, 1, 1 + d); // 2026-02-01 is a Sunday, so getDay() === d
+    for (const style of ['long', 'short']) {
+      const name = ref.toLocaleDateString(LOCALE, { weekday: style }).toLowerCase().replace(/[.,]/g, '').trim();
+      if (!name) continue;
+      if (words.some((w) => name.startsWith(w) || w.startsWith(name))) {
+        dow = ref.getDay();
+        break;
+      }
+    }
+  }
+  if (dow == null) return null;
+
+  const now = new Date();
+  const d = new Date(now);
+  d.setHours(hour, min, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() - dow + 7) % 7));
+  if (d.getTime() > now.getTime()) d.setDate(d.getDate() - 7); // keep it in the past
+  return d.getTime();
+}
+
+async function calibrateWeekly(p) {
+  if (!p || !p.account) return;
+  const example = new Date(2026, 1, 4, 7, 0).toLocaleDateString(LOCALE, { weekday: 'long' }) + ' 07:00';
+  const value = await ui.prompt({
+    title: t('lim.calibrate'),
+    message: t('set.calibrationHint'),
+    value: '',
+    confirmText: t('common.save'),
+    cancelText: t('common.cancel'),
+    validate: (input) => (input.trim() && !parseWeeklyReset(input) ? t('lim.calibrateBad', { example }) : null),
+  });
+  if (value === null) return;
+  const ms = parseWeeklyReset(value);
+  if (!ms) return;
+  await window.api.calibrateWeekly(p.account.organizationUuid, ms);
+  toast(t('lim.calibrated'), 'ok');
+  S.plan = await window.api.planUsage();
+  render();
+}
+
+async function pasteToken(p) {
+  if (!p) return;
+  const token = await ui.prompt({
+    title: t('dlg.tokenTitle'),
+    message: t('dlg.tokenHint'),
+    value: '',
+    confirmText: t('common.save'),
+    cancelText: t('common.cancel'),
+  });
+  if (token === null || !token.trim()) return;
+  await window.api.setApiToken(p.slot, token.trim());
+  toast(t('toast.saved'), 'ok');
+  refresh({ silent: true, forceApi: true });
+}
+
+/** The one-time startup question offering live usage via the API. */
+async function askApiPrompt() {
+  const yes = await ui.confirm({
+    title: t('apiPrompt.title'),
+    message: t('apiPrompt.body'),
+    confirmText: t('apiPrompt.enable'),
+    cancelText: t('apiPrompt.later'),
+  });
+  await window.api.config.set({ apiPrompted: true, apiMode: yes ? 'active' : 'off' });
+  if (yes) refresh({ silent: true, forceApi: true });
 }
 
 async function doSwitch(slot) {
@@ -1059,6 +1228,7 @@ async function init() {
     render();
     if (tab === 'code' && !S.cli && !S.cliLoading) loadCli();
   });
+  window.api.onApiPrompt(() => askApiPrompt());
   window.api.onCliProgress(({ done, total }) => {
     const el = $('#cliProgress');
     if (el) el.textContent = t('code.progress', { done, total });

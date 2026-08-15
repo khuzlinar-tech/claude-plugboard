@@ -81,10 +81,10 @@ module.exports = {
   'lim.title': 'Limites',
   'lim.fh': 'Fenêtre de 5 heures',
   'lim.sd': 'Limite hebdomadaire',
-  'lim.resetIn': 'réinitialisation dans {dur} · {time}',
+  'lim.resetBefore': 'réinitialisation avant {time} — sous {dur}',
   'lim.notStarted': 'fenêtre non commencée',
-  'lim.resetAt': 'réinitialisation {when}',
-  'lim.noReset': 'heure de réinitialisation inconnue',
+  'lim.resetBeforeAt': 'réinitialisation avant {when}',
+  'lim.resetUnknown': 'aucune réinitialisation observée — l’heure exacte est affichée par Claude',
   'lim.history': 'Historique de consommation',
   'lim.samplesInfo': 'Mesures : {n} · première {from} · dernière {to}.',
   'lim.gaps': 'Les ruptures de la courbe correspondent aux périodes où Claude était fermé et rien n’était enregistré.',
@@ -94,7 +94,7 @@ module.exports = {
   'lim.noOrgData':
     'Aucune mesure pour le compte de ce profil. Elles apparaissent tant que Claude Desktop tourne sous ce compte.',
   'lim.source':
-    'Les pourcentages proviennent de plan-usage-history.json, les mêmes chiffres que Claude affiche. L’heure de réinitialisation est déduite de la dernière remise à zéro du compteur : c’est une estimation, pas une date officielle.',
+    'Les pourcentages proviennent de plan-usage-history.json, les mêmes chiffres que Claude affiche. Les heures de réinitialisation sont des bornes supérieures déduites de ces mesures : le fichier ne contient que des valeurs arrondies prises toutes les ~15 minutes, l’instant exact d’ouverture d’une fenêtre est donc irrécupérable. Les heures exactes sont affichées par Claude lui-même.',
   'lim.col.profile': 'Profil',
   'lim.col.plan': 'Formule',
   'lim.col.sample': 'Mesure',
@@ -299,7 +299,7 @@ module.exports = {
     'Ce projet n’est ni affilié à Anthropic, ni approuvé ni pris en charge par elle. « Claude » est une marque d’Anthropic, mentionnée ici uniquement pour décrire ce avec quoi l’outil fonctionne. Ne signalez pas au support d’Anthropic les problèmes causés par cet outil.',
   'consent.local.h': 'Tout reste sur cet ordinateur',
   'consent.local.b':
-    'L’application déplace, entre des dossiers de cette machine, des fichiers que Claude Desktop et Claude Code y ont déjà écrits. Elle n’effectue aucun appel réseau, ne collecte aucune télémétrie et n’a aucun compte propre.',
+    'L’application déplace, entre des dossiers de cette machine, des fichiers que Claude Desktop et Claude Code y ont déjà écrits. Elle ne collecte aucune télémétrie et n’a aucun compte propre. Une fonction facultative, désactivée tant que vous ne l’activez pas, interroge le point d’accès « usage » d’Anthropic pour obtenir les chiffres exacts en utilisant le jeton que Claude Code a déjà enregistré ici : ce jeton part uniquement vers api.anthropic.com, uniquement dans l’en-tête de la requête, n’est jamais journalisé ni envoyé ailleurs. Rien d’autre ne touche au réseau.',
   'consent.ai.h': 'Écrit avec l’aide d’une IA',
   'consent.ai.b':
     'Cette application a été écrite en grande partie par un assistant IA, puis relue par un humain. Traitez-la comme tout code tiers : lisez les sources avant de lui confier quelque chose d’important.',
@@ -309,6 +309,51 @@ module.exports = {
   'consent.accept': 'J’ai lu et j’accepte ce qui précède',
   'consent.agree': 'Continuer',
   'consent.decline': 'Quitter',
+
+  'lim.resetExact': 'réinitialisation {when}',
+  'lim.resetExactIn': 'réinitialisation {when} — dans {dur}',
+  'lim.sourceApi': 'exact, depuis l’API d’usage de Claude',
+  'lim.calibrate': 'Indiquer la réinitialisation hebdomadaire exacte',
+  'lim.calibrated': 'Réinitialisation hebdomadaire calibrée',
+  'lim.calibrateBad': 'Indiquez un jour de la semaine et une heure, par exemple « {example} ».',
+  'lim.viaApi': 'depuis l’API',
+
+  'err.API_NO_TOKEN': 'Aucun jeton Claude Code pour ce profil. Saisissez-en un manuellement ci-dessous.',
+  'err.API_TOKEN_EXPIRED': 'Le jeton Claude Code a expiré. Ouvrez Claude Code une fois pour le renouveler, ou saisissez-en un nouveau.',
+  'err.API_UNAUTHORIZED': 'L’API a rejeté le jeton (non autorisé). Il est peut-être erroné ou expiré.',
+  'err.API_HTTP': 'L’API d’usage a renvoyé une erreur (HTTP {status}).',
+  'err.API_TIMEOUT': 'L’API d’usage n’a pas répondu à temps.',
+  'err.API_NETWORK': 'Impossible de joindre l’API d’usage : {detail}',
+
+  'set.liveUsage': 'Limites exactes (via API)',
+  'set.apiMode': 'Lire les valeurs exactes depuis l’API de Claude',
+  'apiMode.off': 'Désactivé — fichiers locaux uniquement',
+  'apiMode.active': 'Profil actif uniquement',
+  'apiMode.all': 'Tous les profils',
+  'set.apiModeHint':
+    'Une fois activé, l’application lit le jeton OAuth que Claude Code a enregistré sur cette machine et demande au point d’accès « usage » d’Anthropic les valeurs et heures de réinitialisation exactes. Le jeton part uniquement vers api.anthropic.com, uniquement dans l’en-tête, et n’est ni stocké ni journalisé. C’est la seule fonction qui utilise le réseau.',
+  'set.apiAllWarning':
+    'Interroger plusieurs comptes depuis une même machine et une même IP correspond exactement au schéma qui ressemble à de l’automatisation multicompte. Le risque porte sur vos comptes, pas sur cette application. À n’activer que si vous l’acceptez.',
+  'set.apiToken': 'Jeton manuel',
+  'set.apiTokenSet': 'un jeton est enregistré pour ce profil',
+  'set.apiTokenNone': 'aucun jeton manuel',
+  'set.apiTokenEnter': 'Saisir le jeton…',
+  'set.apiTokenClear': 'Supprimer le jeton',
+  'set.apiTokenHelpTitle': 'Où trouver le jeton',
+  'set.apiTokenHelp':
+    'Le jeton est la valeur de « accessToken » dans le fichier .credentials.json de votre dossier .claude, présent après connexion à Claude Code. Ouvrez ce fichier, copiez la longue chaîne accessToken et collez-la ici. Elle est conservée chiffrée sur cette machine.',
+  'set.calibration': 'Heure de réinitialisation hebdomadaire',
+  'set.calibrationHint':
+    'Le fichier sur disque ne permet pas de fixer la réinitialisation hebdomadaire exacte. Saisissez l’heure affichée par la vue d’usage de Claude (par exemple « mercredi 07:00 ») et elle sera exacte ensuite. Apprise automatiquement dès qu’une réinitialisation est observée.',
+
+  'apiPrompt.title': 'Afficher les valeurs exactes ?',
+  'apiPrompt.body':
+    'Par défaut, l’application ne lit que des fichiers locaux, donc les heures de réinitialisation sont des estimations. Elle peut, si vous le souhaitez, demander les valeurs exactes au point d’accès « usage » d’Anthropic en utilisant le jeton déjà enregistré ici par Claude Code — la seule fonction qui utilise le réseau. Désactivée par défaut ; modifiable à tout moment dans les paramètres.',
+  'apiPrompt.enable': 'Activer pour le profil actif',
+  'apiPrompt.later': 'Pas maintenant',
+
+  'dlg.tokenTitle': 'Jeton manuel',
+  'dlg.tokenHint': 'Collez l’accessToken issu de .credentials.json (voir les paramètres pour savoir où le trouver).',
 
   'platform.title': 'Windows uniquement',
   'platform.body':

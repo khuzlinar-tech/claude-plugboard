@@ -365,6 +365,14 @@ table.tbl tr.is-active td:first-child { color: var(--accent); font-weight: 600; 
 
 .muted { color: var(--muted); }
 .mono { font-family: var(--mono); }
+
+/* Marks a figure that came from the live API rather than the local estimate. */
+.src-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
+  font-size: 10px; font-weight: 650; letter-spacing: .02em;
+  background: var(--badge-ok-bg); color: var(--badge-ok-text); border: 1px solid var(--badge-ok-line);
+}
+.link { color: var(--accent); text-decoration: underline; cursor: pointer; }
 .hidden { display: none !important; }
 .spacer { flex: 1; }
 

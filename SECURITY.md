@@ -7,12 +7,32 @@ storage and `~/.claude/.credentials.json`. It moves them between folders on your
 and never transmits them. Bugs that could expose those files, or cause them to be lost, are
 treated as security issues.
 
+## Network access
+
+The app makes **no** network requests unless you turn on **Live usage** (Settings →
+Claude), which is off by default and asked about once at first run.
+
+With it on, and only for the profiles you selected, the app:
+
+- reads the OAuth access token that Claude Code stores in plaintext at
+  `~/.claude/.credentials.json` (or the copy inside the profile store), or a token you
+  entered by hand;
+- sends `GET https://api.anthropic.com/api/oauth/usage` with that token in the
+  `Authorization` header, to read exact usage percentages and reset times.
+
+`api.anthropic.com` is the only host the app ever contacts. The token is never logged,
+never written anywhere except — for manually entered tokens — the app's own settings
+file, encrypted with Windows DPAPI via Electron's `safeStorage`. There is no telemetry
+and no analytics, with the feature on or off.
+
+Enabling it for several accounts at once means authenticated requests for multiple
+accounts from one machine. That is your decision to make; the setting says so plainly.
+
 ## What the app does not do
 
-- No network requests, telemetry, or analytics of any kind.
-- No credentials are read, parsed, or displayed. The app reads only the non-secret
-  `oauthAccount` block of `.claude.json` (e-mail, plan, organization) and the usage
-  percentages in `plan-usage-history.json`.
+- No credentials are parsed or displayed beyond the single token field described above.
+  Account details come from the non-secret `oauthAccount` block of `.claude.json`
+  (e-mail, plan, organization) and the percentages in `plan-usage-history.json`.
 - Renderers run with `contextIsolation` on and `nodeIntegration` off. All filesystem and
   process access lives in the main process behind a narrow `contextBridge` API.
 - A strict Content-Security-Policy blocks remote script, style and image loading in every

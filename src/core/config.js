@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Bump when the consent text changes materially, so it is shown again.
-const CONSENT_VERSION = 1;
+// v2: added the optional live-usage feature, which can make network requests.
+const CONSENT_VERSION = 2;
 
 const DEFAULTS = {
   language: 'auto', // auto | en | ru | de | es | fr | pt | zh | ja
@@ -20,6 +21,21 @@ const DEFAULTS = {
   pollIntervalSec: 4,
   switchScope: 'both', // both | desktop | code
   consentVersion: 0,
+
+  // Exact weekly reset anchors, per organization uuid. A value is one epoch-ms
+  // moment when the weekly window is known to reset; the rest is derived by
+  // rolling forward whole weeks. Learned automatically from an observed reset,
+  // or entered by hand. Nothing here leaves the machine.
+  weeklyAnchors: {},
+
+  // Live usage via Anthropic's OAuth usage endpoint. Off unless the user opts in.
+  //   apiMode: 'off' | 'active' | 'all'
+  //   apiPrompted: whether the one-time startup question has been shown
+  //   apiTokens: manually entered tokens, encrypted at rest, keyed by slot
+  apiMode: 'off',
+  apiPrompted: false,
+  apiTokens: {},
+
   // Manual override for the Claude install: { kind: 'store', appId } | { kind: 'exe', path }
   claudeApp: null,
   windowBounds: null,
@@ -71,11 +87,22 @@ function set(patch) {
 }
 
 function reset() {
-  // Window geometry and the accepted consent survive a settings reset.
+  // Window geometry, accepted consent and learned reset anchors survive a reset.
+  // Tokens and the API opt-in are cleared — resetting settings should not silently
+  // keep a live-usage connection running.
   return set(Object.assign({}, DEFAULTS, {
     windowBounds: data.windowBounds,
     consentVersion: data.consentVersion,
+    weeklyAnchors: data.weeklyAnchors,
   }));
+}
+
+/** Records a known weekly-reset moment for an org, used to compute exact resets. */
+function setWeeklyAnchor(orgUuid, epochMs) {
+  if (!orgUuid || !epochMs) return;
+  const anchors = Object.assign({}, data.weeklyAnchors);
+  anchors[orgUuid] = epochMs;
+  set({ weeklyAnchors: anchors });
 }
 
 function onChange(fn) {
@@ -83,4 +110,4 @@ function onChange(fn) {
   return () => listeners.delete(fn);
 }
 
-module.exports = { DEFAULTS, CONSENT_VERSION, init, all, get, set, reset, onChange };
+module.exports = { DEFAULTS, CONSENT_VERSION, init, all, get, set, reset, setWeeklyAnchor, onChange };

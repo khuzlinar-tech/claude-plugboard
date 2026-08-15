@@ -81,10 +81,10 @@ module.exports = {
   'lim.title': 'Limits',
   'lim.fh': '5-hour window',
   'lim.sd': 'Weekly limit',
-  'lim.resetIn': 'resets in {dur} · {time}',
+  'lim.resetBefore': 'resets by {time} — within {dur}',
   'lim.notStarted': 'window not started',
-  'lim.resetAt': 'resets {when}',
-  'lim.noReset': 'reset time unknown',
+  'lim.resetBeforeAt': 'resets by {when}',
+  'lim.resetUnknown': 'no reset observed yet — Claude’s own usage view has the exact time',
   'lim.history': 'Usage history',
   'lim.samplesInfo': 'Samples: {n} · first {from} · last {to}.',
   'lim.gaps': 'Gaps in the line are periods when Claude was closed and nothing was recorded.',
@@ -94,11 +94,18 @@ module.exports = {
   'lim.noOrgData':
     'No usage samples yet for this profile’s account. Samples appear while Claude Desktop runs under that account.',
   'lim.source':
-    'Percentages come from plan-usage-history.json — the same numbers Claude itself displays. Reset time is derived from the last counter reset, so it is an estimate, not an official date.',
+    'Percentages come from plan-usage-history.json — the same numbers Claude itself displays. Reset times are upper bounds worked out from those samples: the file holds rounded values taken every ~15 minutes, so the exact moment a window opened cannot be recovered from it. Claude’s own usage view has the precise times.',
   'lim.col.profile': 'Profile',
   'lim.col.plan': 'Plan',
   'lim.col.sample': 'Sample',
   'lim.peakTip': '{day} — peak {v}%',
+  'lim.resetExact': 'resets {when}',
+  'lim.resetExactIn': 'resets {when} — in {dur}',
+  'lim.sourceApi': 'exact, from Claude’s usage API',
+  'lim.calibrate': 'Set exact weekly reset',
+  'lim.calibrated': 'Weekly reset calibrated',
+  'lim.calibrateBad': 'Enter a weekday and time, for example “{example}”.',
+  'lim.viaApi': 'live from API',
 
   'range.6h': '6 h',
   'range.24h': '24 h',
@@ -185,6 +192,12 @@ module.exports = {
   'err.USAGE_FILE_MISSING': 'plan-usage-history.json not found. Open Claude Desktop at least once.',
   'err.USAGE_FILE_BROKEN': 'Could not parse the limits history: {detail}',
   'err.NO_TRANSCRIPTS': 'No Claude Code transcripts found (~/.claude/projects is empty).',
+  'err.API_NO_TOKEN': 'No Claude Code token for this profile. Enter one manually below.',
+  'err.API_TOKEN_EXPIRED': 'The Claude Code token has expired. Open Claude Code once to refresh it, or enter a fresh token.',
+  'err.API_UNAUTHORIZED': 'The API rejected the token (unauthorized). It may be wrong or expired.',
+  'err.API_HTTP': 'The usage API returned an error (HTTP {status}).',
+  'err.API_TIMEOUT': 'The usage API did not respond in time.',
+  'err.API_NETWORK': 'Could not reach the usage API: {detail}',
   'err.unknown': 'Unknown error',
 
   'tray.open': 'Open',
@@ -275,6 +288,27 @@ module.exports = {
   'set.notSwitchedHint':
     'plan-usage-history.json stays shared: every sample is tagged with an organization id, so a single file holds the limit history of all accounts and makes comparison possible.',
 
+  'set.liveUsage': 'Live usage (via API)',
+  'set.apiMode': 'Read exact usage from Claude’s API',
+  'apiMode.off': 'Off — read only local files',
+  'apiMode.active': 'Active profile only',
+  'apiMode.all': 'All profiles',
+  'set.apiModeHint':
+    'When on, the app reads the OAuth token Claude Code stored on this machine and asks Anthropic’s usage endpoint for exact figures and reset times. The token is sent only to api.anthropic.com, only in the request header, and never stored or logged. This is the only feature that makes any network request.',
+  'set.apiAllWarning':
+    'Querying several accounts from one machine and IP is exactly the pattern that looks like multi-account automation. The risk is to your accounts, not to this app. Only enable this if you accept that.',
+  'set.apiToken': 'Manual token',
+  'set.apiTokenSet': 'a token is saved for this profile',
+  'set.apiTokenNone': 'no manual token',
+  'set.apiTokenEnter': 'Enter token…',
+  'set.apiTokenClear': 'Remove token',
+  'set.apiTokenHelpTitle': 'How to get the token',
+  'set.apiTokenHelp':
+    'The token is the value of "accessToken" inside the file .credentials.json in your .claude folder, present after you sign into Claude Code. Open that file, copy the long accessToken string, and paste it here. It stays encrypted on this machine.',
+  'set.calibration': 'Weekly reset time',
+  'set.calibrationHint':
+    'The file on disk cannot pin the exact weekly reset. Enter the time Claude’s own usage view shows (for example “Wed 07:00”) and it will be exact from then on. Learned automatically once a reset is observed.',
+
   'set.about': 'About',
   'set.version': 'Version',
   'set.electron': 'Electron',
@@ -296,7 +330,7 @@ module.exports = {
     'This project is not affiliated with, endorsed by, or supported by Anthropic. “Claude” is a trademark of Anthropic, used here only to describe what the tool works with. Do not report problems caused by this tool to Anthropic support.',
   'consent.local.h': 'Everything stays on this computer',
   'consent.local.b':
-    'The app moves files that Claude Desktop and Claude Code have already written on this machine between folders on this machine. It has no network calls, no telemetry, and no accounts of its own.',
+    'The app moves files that Claude Desktop and Claude Code have already written on this machine between folders on this machine. It has no telemetry and no accounts of its own. One optional feature, off unless you turn it on, asks Anthropic’s usage endpoint for exact figures using the token Claude Code already stored here — that token goes only to api.anthropic.com, only in the request header, and is never logged or sent anywhere else. Nothing else ever touches the network.',
   'consent.ai.h': 'Written with AI assistance',
   'consent.ai.b':
     'This application was written largely by an AI assistant and reviewed by a human. Treat it as you would any third-party code: read the source before trusting it with anything important.',
@@ -310,4 +344,13 @@ module.exports = {
   'platform.title': 'Windows only',
   'platform.body':
     'This build supports Windows. Claude Desktop stores its data differently on other systems, so switching profiles here would not work correctly.',
+
+  'apiPrompt.title': 'Show exact usage?',
+  'apiPrompt.body':
+    'By default this app reads only local files, so reset times are estimates. It can optionally ask Anthropic’s usage endpoint for the exact numbers, using the token Claude Code already stored on this machine — the only feature that makes a network request. Off by default; you can change it any time in Settings.',
+  'apiPrompt.enable': 'Turn on for the active profile',
+  'apiPrompt.later': 'Not now',
+
+  'dlg.tokenTitle': 'Manual token',
+  'dlg.tokenHint': 'Paste the accessToken from .credentials.json (see Settings for how to find it).',
 };

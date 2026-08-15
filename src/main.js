@@ -11,6 +11,7 @@ const {
   Notification,
   nativeImage,
   nativeTheme,
+  safeStorage,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -21,6 +22,7 @@ const profiles = require('./core/profiles');
 const claudeApp = require('./core/claudeApp');
 const usage = require('./core/usage');
 const cliusage = require('./core/cliusage');
+const apiUsage = require('./core/apiUsage');
 const i18n = require('./i18n');
 
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -42,7 +44,89 @@ let switching = false;
 // org -> { fh: {value, notifiedFor}, sd: {...} } — keeps notifications to one per window
 const limitState = Object.create(null);
 
+// org -> { at, result } — cached live-usage responses, so multi-account polling
+// stays gentle rather than hitting the endpoint on every UI refresh.
+const apiCache = new Map();
+const API_MIN_INTERVAL_MS = 3 * 60 * 1000;
+
 const t = (key, params) => i18n.translate(lang, key, params);
+
+/** Reads plan usage with the stored weekly anchors applied. */
+function readUsage() {
+  return usage.readPlanUsage({ anchors: config.get('weeklyAnchors') || {} });
+}
+
+/**
+ * Persists a weekly reset the moment it is first observed, so the exact time is
+ * known from then on even if the sample history is later trimmed. Free and local.
+ */
+function learnAnchors(plan) {
+  if (!plan || !plan.ok) return;
+  const anchors = config.get('weeklyAnchors') || {};
+  for (const [org, u] of Object.entries(plan.orgs)) {
+    if (u.weekly.observedReset && !anchors[org]) config.setWeeklyAnchor(org, u.weekly.observedReset);
+  }
+}
+
+/* --------------------------------------------------------- manual API tokens */
+
+function encryptToken(plain) {
+  try {
+    if (safeStorage.isEncryptionAvailable()) return 'v1:' + safeStorage.encryptString(plain).toString('base64');
+  } catch {
+    /* fall through to plaintext-with-marker below */
+  }
+  return 'raw:' + Buffer.from(plain, 'utf8').toString('base64');
+}
+
+function decryptToken(stored) {
+  if (!stored) return null;
+  try {
+    if (stored.startsWith('v1:')) return safeStorage.decryptString(Buffer.from(stored.slice(3), 'base64'));
+    if (stored.startsWith('raw:')) return Buffer.from(stored.slice(4), 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function manualTokenFor(slot) {
+  const tokens = config.get('apiTokens') || {};
+  return tokens[slot] ? decryptToken(tokens[slot]) : null;
+}
+
+function storeManualToken(slot, plainOrNull) {
+  const tokens = Object.assign({}, config.get('apiTokens') || {});
+  if (plainOrNull) tokens[slot] = encryptToken(plainOrNull.trim());
+  else delete tokens[slot];
+  config.set({ apiTokens: tokens });
+  apiCache.clear();
+}
+
+/**
+ * Live usage for one profile, honouring the min-interval cache. Returns null
+ * when API mode does not cover this profile.
+ */
+async function apiUsageFor(profile, force) {
+  const mode = config.get('apiMode');
+  if (mode === 'off') return null;
+  if (mode === 'active' && !profile.isActive) return null;
+
+  const org = profile.account && profile.account.organizationUuid;
+  if (!org) return null;
+
+  const cached = apiCache.get(org);
+  if (!force && cached && Date.now() - cached.at < API_MIN_INTERVAL_MS) return cached.result;
+
+  const result = await apiUsage.usageForProfile({
+    slot: profile.slot,
+    isActive: profile.isActive,
+    manualToken: manualTokenFor(profile.slot),
+  });
+  if (result.ok) result.fetchedAt = Date.now();
+  apiCache.set(org, { at: Date.now(), result });
+  return result;
+}
 
 /* ---------------------------------------------------------- single instance */
 
@@ -250,7 +334,7 @@ function openConsent(mode) {
 function activeUsage(list) {
   const active = list.find((p) => p.isActive);
   if (!active || !active.account) return { active, u: null };
-  const plan = usage.readPlanUsage();
+  const plan = readUsage();
   const u = plan.ok ? plan.orgs[active.account.organizationUuid] : null;
   return { active, u: u || null };
 }
@@ -413,8 +497,9 @@ function checkLimits() {
     return;
   }
 
-  const plan = usage.readPlanUsage();
+  const plan = readUsage();
   if (!plan.ok) return;
+  learnAnchors(plan);
 
   for (const p of list) {
     const org = p.account && p.account.organizationUuid;
@@ -426,7 +511,8 @@ function checkLimits() {
 
     for (const key of ['fh', 'sd']) {
       const value = u.latest[key];
-      const start = (key === 'fh' ? u.fiveHour : u.weekly).start;
+      // Identifies the current limit window, so one notification is sent per window.
+      const window = key === 'fh' ? u.fiveHour.openedBy : u.weekly.resetBefore;
       const prev = limitState[org][key];
 
       if (wantReset && prev && prev.value - value >= RESET_MIN_DROP) {
@@ -437,12 +523,12 @@ function checkLimits() {
       }
 
       let notifiedFor = prev ? prev.notifiedFor : null;
-      if (!u.stale && value >= threshold && start && notifiedFor !== start) {
+      if (!u.stale && value >= threshold && window && notifiedFor !== window) {
         notify(
           t('notif.limitTitle', { pct: value }),
           t('notif.limitBody', { slot: name, window: t(`notif.window.${key}`), pct: value })
         );
-        notifiedFor = start;
+        notifiedFor = window;
       }
 
       limitState[org][key] = { value, notifiedFor };
@@ -586,6 +672,7 @@ app.whenReady().then(() => {
     if (changed.includes('autoStart')) applyAutoStart(config.get('autoStart'));
     if (changed.includes('pollIntervalSec')) startPolling();
     if (changed.includes('notifications')) buildTray();
+    if (changed.includes('apiMode')) apiCache.clear();
     broadcast('config:changed', config.all());
   });
 
@@ -601,6 +688,12 @@ function startApp() {
 
   if (process.argv.includes('--settings')) openSettings();
   if (process.argv.includes('--screenshot')) runScreenshots();
+
+  // One-time question: offer live usage via the API. Shown once, after the main
+  // window is ready, and never again regardless of the answer.
+  if (!config.get('apiPrompted') && config.get('apiMode') === 'off' && mainWin && !process.argv.includes('--screenshot')) {
+    mainWin.webContents.once('did-finish-load', () => setTimeout(() => send(mainWin, 'ui:apiPrompt'), 1200));
+  }
 }
 
 app.on('window-all-closed', () => {
@@ -701,8 +794,49 @@ ipcMain.handle('consent:mode', (e) => {
 });
 
 ipcMain.handle('usage:plan', () => {
-  const plan = usage.readPlanUsage();
+  const plan = readUsage();
+  learnAnchors(plan);
   return DEMO ? maskUsage(plan) : plan;
+});
+
+// Live usage for the in-scope profiles, keyed by organization uuid.
+ipcMain.handle('usage:api', async (_e, { force } = {}) => {
+  const mode = config.get('apiMode');
+  if (mode === 'off') return { mode, results: {} };
+
+  const list = profiles.listProfiles({ withSize: false });
+  const results = {};
+  for (const p of list) {
+    if (!p.account) continue;
+    if (mode === 'active' && !p.isActive) continue;
+    const res = await apiUsageFor(p, force);
+    if (res) results[p.account.organizationUuid] = res;
+  }
+  return { mode, results };
+});
+
+ipcMain.handle('api:tokenState', (_e, slot) => {
+  const list = profiles.listProfiles({ withSize: false });
+  const p = list.find((x) => x.slot === slot);
+  const isActive = !!(p && p.isActive);
+  const tok = apiUsage.tokenForProfile(slot, isActive);
+  return {
+    hasManual: !!manualTokenFor(slot),
+    hasCode: !!tok,
+    codeExpired: tok ? tok.expired : false,
+  };
+});
+
+ipcMain.handle('api:setToken', (_e, { slot, token }) => {
+  storeManualToken(slot, token || null);
+  broadcast('config:changed', config.all());
+  return { ok: true };
+});
+
+ipcMain.handle('api:calibrate', (_e, { orgUuid, epochMs }) => {
+  config.setWeeklyAnchor(orgUuid, epochMs);
+  broadcast('usage:changed');
+  return { ok: true };
 });
 
 ipcMain.handle('usage:cli', async (e) => {

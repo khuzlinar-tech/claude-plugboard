@@ -40,13 +40,21 @@ The application moves files that Claude Desktop and Claude Code have already wri
 your own computer between folders on that same computer, and reads usage figures those
 programs already store locally.
 
-It does not:
+One optional feature, **off by default**, additionally reads the OAuth token Claude Code
+has stored locally and calls Anthropic's own usage endpoint with it, to show exact
+figures instead of estimates. It is opt-in, asked about once, and described in
+[SECURITY.md](SECURITY.md). Note that this uses an undocumented internal endpoint with a
+token issued for an official client; whether that fits your agreement with Anthropic is
+your call, and the risk falls on your account.
+
+The software does not:
 
 - circumvent, patch, or modify any Anthropic software;
 - intercept, proxy, or modify network traffic;
 - bypass authentication, licensing, or any technical protection measure;
+- decrypt credentials that another application stored encrypted;
 - create accounts, or automate any part of Anthropic's services;
-- send data anywhere — there are no network requests, no telemetry, and no analytics.
+- collect telemetry or analytics of any kind.
 
 ## Written with AI assistance
 

@@ -81,10 +81,10 @@ module.exports = {
   'lim.title': '利用上限',
   'lim.fh': '5 時間ウィンドウ',
   'lim.sd': '週間上限',
-  'lim.resetIn': '{dur}後にリセット · {time}',
+  'lim.resetBefore': '{dur}以内、{time} までにリセット',
   'lim.notStarted': 'ウィンドウ未開始',
-  'lim.resetAt': '{when} にリセット',
-  'lim.noReset': 'リセット時刻は特定できません',
+  'lim.resetBeforeAt': '{when} までにリセット',
+  'lim.resetUnknown': 'リセットをまだ観測していません — 正確な時刻は Claude 本体の利用状況画面にあります',
   'lim.history': '利用履歴',
   'lim.samplesInfo': '計測数: {n} · 最初 {from} · 最新 {to}。',
   'lim.gaps': '線の途切れは、Claude が終了していて記録がなかった時間帯です。',
@@ -94,7 +94,7 @@ module.exports = {
   'lim.noOrgData':
     'このプロファイルのアカウントにはまだ計測データがありません。そのアカウントで Claude Desktop を動かしている間に記録されます。',
   'lim.source':
-    'パーセンテージは plan-usage-history.json の値で、Claude 自身が表示する数値と同じです。リセット時刻はカウンタが最後にゼロへ戻った時点から推定した目安であり、公式な日時ではありません。',
+    'パーセンテージは plan-usage-history.json の値で、Claude 自身が表示する数値と同じです。リセット時刻はその計測から導いた上限値です。ファイルには約 15 分ごとの丸めた値しか残らないため、ウィンドウが開いた正確な時刻は復元できません。正確な時刻は Claude 本体の利用状況画面で確認できます。',
   'lim.col.profile': 'プロファイル',
   'lim.col.plan': 'プラン',
   'lim.col.sample': '計測',
@@ -297,7 +297,7 @@ module.exports = {
     '本プロジェクトは Anthropic とは無関係で、同社の承認も支援も受けていません。「Claude」は Anthropic の商標であり、ここでは本ツールの対象を示すためだけに用いています。本ツールが原因の問題を Anthropic のサポートに報告しないでください。',
   'consent.local.h': 'すべてこのパソコンの中で完結します',
   'consent.local.b':
-    '本アプリは、Claude Desktop と Claude Code がこのパソコンにすでに書き込んだファイルを、同じパソコンのフォルダ間で移動するだけです。ネットワーク通信もテレメトリも独自アカウントもありません。',
+    '本アプリは、Claude Desktop と Claude Code がこのパソコンにすでに書き込んだファイルを、同じパソコンのフォルダ間で移動するだけです。テレメトリも独自アカウントもありません。既定では無効の任意機能を有効にした場合のみ、Claude Code がここに保存済みのトークンを使って Anthropic の利用状況エンドポイントに正確な数値を問い合わせます。そのトークンは api.anthropic.com にのみ、リクエストヘッダーの中だけで送られ、記録も他所への送信もされません。それ以外にネットワークを使う処理はありません。',
   'consent.ai.h': 'AI の支援で作成されました',
   'consent.ai.b':
     '本アプリの大部分は AI アシスタントが作成し、人間が確認しています。他のサードパーティ製コードと同様に、重要な用途に使う前にソースコードをお読みください。',
@@ -307,6 +307,51 @@ module.exports = {
   'consent.accept': '上記を読み、同意します',
   'consent.agree': '続ける',
   'consent.decline': '終了',
+
+  'lim.resetExact': '{when} にリセット',
+  'lim.resetExactIn': '{when} にリセット — あと {dur}',
+  'lim.sourceApi': '正確な値、Claude の利用状況 API より',
+  'lim.calibrate': '週次リセット時刻を指定',
+  'lim.calibrated': '週次リセットを校正しました',
+  'lim.calibrateBad': '曜日と時刻を入力してください。例：「{example}」',
+  'lim.viaApi': 'API から',
+
+  'err.API_NO_TOKEN': 'このプロファイルには Claude Code のトークンがありません。下で手動入力してください。',
+  'err.API_TOKEN_EXPIRED': 'Claude Code のトークンが期限切れです。Claude Code を一度開いて更新するか、新しいトークンを入力してください。',
+  'err.API_UNAUTHORIZED': 'API がトークンを拒否しました（未認証）。誤っているか期限切れの可能性があります。',
+  'err.API_HTTP': '利用状況 API がエラーを返しました（HTTP {status}）。',
+  'err.API_TIMEOUT': '利用状況 API が時間内に応答しませんでした。',
+  'err.API_NETWORK': '利用状況 API に接続できませんでした: {detail}',
+
+  'set.liveUsage': '正確な利用状況（API 経由）',
+  'set.apiMode': 'Claude の API から正確な数値を読む',
+  'apiMode.off': 'オフ — ローカルファイルのみ',
+  'apiMode.active': '使用中のプロファイルのみ',
+  'apiMode.all': 'すべてのプロファイル',
+  'set.apiModeHint':
+    '有効にすると、Claude Code がこのパソコンに保存した OAuth トークンを読み取り、Anthropic の利用状況エンドポイントに正確な数値とリセット時刻を問い合わせます。トークンは api.anthropic.com にのみ、リクエストヘッダーの中だけで送られ、保存も記録もされません。ネットワークを使うのはこの機能だけです。',
+  'set.apiAllWarning':
+    '同じパソコン・同じ IP から複数アカウントを問い合わせる動きは、まさに複数アカウントの自動化に見えるパターンです。リスクを負うのは本アプリではなくあなたのアカウントです。承知のうえでのみ有効にしてください。',
+  'set.apiToken': '手動トークン',
+  'set.apiTokenSet': 'このプロファイル用のトークンを保存済み',
+  'set.apiTokenNone': '手動トークンなし',
+  'set.apiTokenEnter': 'トークンを入力…',
+  'set.apiTokenClear': 'トークンを削除',
+  'set.apiTokenHelpTitle': 'トークンの入手方法',
+  'set.apiTokenHelp':
+    'トークンは .claude フォルダ内の .credentials.json にある「accessToken」の値で、Claude Code にサインインすると作成されます。そのファイルを開き、長い accessToken の文字列をコピーしてここに貼り付けてください。このパソコン上では暗号化して保存されます。',
+  'set.calibration': '週次リセットの時刻',
+  'set.calibrationHint':
+    'ディスク上のファイルからは正確な週次リセット時刻を特定できません。Claude 本体の利用状況画面が示す時刻（例：「水曜 07:00」）を入力すれば、以降は正確になります。リセットを一度観測できれば自動で学習します。',
+
+  'apiPrompt.title': '正確な数値を表示しますか？',
+  'apiPrompt.body':
+    '既定では本アプリはローカルファイルしか読まないため、リセット時刻は推定値です。任意で、Claude Code がここに保存済みのトークンを使い、Anthropic の利用状況エンドポイントから正確な数値を取得できます（ネットワークを使う唯一の機能です）。既定では無効で、設定からいつでも変更できます。',
+  'apiPrompt.enable': '使用中のプロファイルで有効にする',
+  'apiPrompt.later': '今はしない',
+
+  'dlg.tokenTitle': '手動トークン',
+  'dlg.tokenHint': '.credentials.json の accessToken を貼り付けてください（場所は設定に記載しています）。',
 
   'platform.title': 'Windows 専用',
   'platform.body':

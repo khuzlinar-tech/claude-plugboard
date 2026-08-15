@@ -81,10 +81,10 @@ module.exports = {
   'lim.title': '用量限制',
   'lim.fh': '5 小时窗口',
   'lim.sd': '每周限额',
-  'lim.resetIn': '{dur}后重置 · {time}',
+  'lim.resetBefore': '{dur}内重置，不晚于 {time}',
   'lim.notStarted': '窗口尚未开始',
-  'lim.resetAt': '{when} 重置',
-  'lim.noReset': '无法确定重置时间',
+  'lim.resetBeforeAt': '不晚于 {when} 重置',
+  'lim.resetUnknown': '尚未观察到重置 — 准确时间请看 Claude 自身的用量页面',
   'lim.history': '用量历史',
   'lim.samplesInfo': '记录数：{n} · 最早 {from} · 最新 {to}。',
   'lim.gaps': '曲线的断点是 Claude 关闭、未记录数据的时段。',
@@ -93,7 +93,7 @@ module.exports = {
   'lim.noPeriodData': '所选时间段内没有数据。',
   'lim.noOrgData': '此配置档的账户尚无任何记录。记录会在 Claude Desktop 以该账户运行时产生。',
   'lim.source':
-    '百分比来自 plan-usage-history.json，与 Claude 自身显示的数字相同。重置时间根据计数器上一次归零推算，因此是估算值，而非官方时间。',
+    '百分比来自 plan-usage-history.json，与 Claude 自身显示的数字相同。重置时间是根据这些采样推算出的上界：文件每约 15 分钟只记录一次四舍五入后的数值，因此无法还原窗口开始的确切时刻。准确时间以 Claude 自身的用量页面为准。',
   'lim.col.profile': '配置档',
   'lim.col.plan': '套餐',
   'lim.col.sample': '记录',
@@ -294,7 +294,7 @@ module.exports = {
     '本项目与 Anthropic 无隶属关系，未获其认可或支持。“Claude”是 Anthropic 的商标，此处仅用于说明本工具的适用对象。请勿就本工具引起的问题联系 Anthropic 支持。',
   'consent.local.h': '所有数据留在本机',
   'consent.local.b':
-    '本应用只是在本机的文件夹之间移动 Claude Desktop 与 Claude Code 已经写入的文件。它没有网络请求、没有遥测，也没有自己的账户。',
+    '本应用只是在本机的文件夹之间移动 Claude Desktop 与 Claude Code 已经写入的文件。它没有遥测，也没有自己的账户。有一项可选功能默认关闭，只有你开启后，才会用 Claude Code 已保存在本机的令牌向 Anthropic 的用量接口查询准确数值：该令牌只发往 api.anthropic.com，只出现在请求头中，不会被记录，也不会发往任何其他地方。除此之外没有任何网络行为。',
   'consent.ai.h': '由 AI 协助编写',
   'consent.ai.b':
     '本应用主要由 AI 助手编写，并经人工审阅。请像对待任何第三方代码一样：在托付重要事务前先阅读源码。',
@@ -304,6 +304,51 @@ module.exports = {
   'consent.accept': '我已阅读并接受以上内容',
   'consent.agree': '继续',
   'consent.decline': '退出',
+
+  'lim.resetExact': '{when} 重置',
+  'lim.resetExactIn': '{when} 重置 — 还有 {dur}',
+  'lim.sourceApi': '准确值，来自 Claude 用量 API',
+  'lim.calibrate': '设置准确的每周重置时间',
+  'lim.calibrated': '每周重置已校准',
+  'lim.calibrateBad': '请填写星期和时间，例如「{example}」。',
+  'lim.viaApi': '来自 API',
+
+  'err.API_NO_TOKEN': '该配置档没有 Claude Code 令牌，请在下方手动填写。',
+  'err.API_TOKEN_EXPIRED': 'Claude Code 令牌已过期。打开一次 Claude Code 以刷新，或填入新的令牌。',
+  'err.API_UNAUTHORIZED': 'API 拒绝了该令牌（未授权），可能有误或已过期。',
+  'err.API_HTTP': '用量 API 返回错误（HTTP {status}）。',
+  'err.API_TIMEOUT': '用量 API 未在规定时间内响应。',
+  'err.API_NETWORK': '无法连接用量 API：{detail}',
+
+  'set.liveUsage': '准确用量（通过 API）',
+  'set.apiMode': '从 Claude 的 API 读取准确数值',
+  'apiMode.off': '关闭 — 仅读取本地文件',
+  'apiMode.active': '仅当前配置档',
+  'apiMode.all': '全部配置档',
+  'set.apiModeHint':
+    '开启后，应用会读取 Claude Code 保存在本机的 OAuth 令牌，向 Anthropic 的用量接口查询准确的数值与重置时间。令牌只发往 api.anthropic.com，只出现在请求头中，不会被保存或记录。这是本应用唯一会使用网络的功能。',
+  'set.apiAllWarning':
+    '从同一台机器、同一个 IP 查询多个账户，正是看起来像多账号自动化的行为模式。风险落在你的账户上，而不是这个应用。只有接受这一点再开启。',
+  'set.apiToken': '手动令牌',
+  'set.apiTokenSet': '此配置档已保存令牌',
+  'set.apiTokenNone': '没有手动令牌',
+  'set.apiTokenEnter': '填写令牌…',
+  'set.apiTokenClear': '删除令牌',
+  'set.apiTokenHelpTitle': '如何获取令牌',
+  'set.apiTokenHelp':
+    '令牌是 .claude 文件夹内 .credentials.json 文件中「accessToken」字段的值，登录 Claude Code 后即会生成。打开该文件，复制那串很长的 accessToken 并粘贴到这里。它会加密保存在本机。',
+  'set.calibration': '每周重置时间',
+  'set.calibrationHint':
+    '磁盘上的文件无法确定准确的每周重置时刻。请填入 Claude 自身用量页面显示的时间（例如「星期三 07:00」），此后即为准确值。一旦观察到一次重置，也会自动学到。',
+
+  'apiPrompt.title': '是否显示准确数值？',
+  'apiPrompt.body':
+    '默认情况下应用只读取本地文件，因此重置时间只是估算。你可以选择让它用 Claude Code 已保存在本机的令牌，向 Anthropic 的用量接口查询准确数值 —— 这是唯一会使用网络的功能。默认关闭，随时可在设置中更改。',
+  'apiPrompt.enable': '为当前配置档开启',
+  'apiPrompt.later': '暂不',
+
+  'dlg.tokenTitle': '手动令牌',
+  'dlg.tokenHint': '粘贴 .credentials.json 中的 accessToken（设置里说明了在哪里找）。',
 
   'platform.title': '仅支持 Windows',
   'platform.body':

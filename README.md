@@ -51,7 +51,27 @@ the cookies and the Claude Code credentials all come back exactly as you left th
 - **Dark, light and system theme.**
 - **8 languages** — English, Deutsch, Español, Français, 日本語, Português, Русский, 简体中文.
   Follows the system language by default.
-- **No runtime dependencies, no network access, no telemetry.**
+- **Exact figures, optionally** — off by default, asked about once. See below.
+- **No runtime dependencies, no telemetry.**
+
+## Estimates, and how to make them exact
+
+Usage percentages read from disk are exact — they are the same numbers Claude shows.
+**Reset times are not.** The file holds values rounded to whole percent, sampled every
+~15 minutes, so the moment a window opened cannot be recovered from it. The app says
+"resets by 18:42" rather than inventing a precise time, and says so plainly when a
+weekly reset has never been observed.
+
+Two ways to get exact reset times:
+
+1. **Calibration** (no network). Claude's own usage view states the weekly reset, e.g.
+   "Resets Wed 7:00 AM". Enter that once — the whole string works — and it is exact from
+   then on. The app also learns the anchor by itself the first time it observes a reset.
+2. **Live usage** (opt-in, makes network requests). Reads the OAuth token Claude Code
+   stored locally and asks `api.anthropic.com/api/oauth/usage` for the exact figures.
+   Off by default, asked about once at first run, and limited to the active profile
+   unless you widen it. Only works for profiles signed into Claude Code; otherwise the
+   app offers to take a token by hand. Details in [SECURITY.md](SECURITY.md).
 
 | Limits | Claude Code |
 |---|---|

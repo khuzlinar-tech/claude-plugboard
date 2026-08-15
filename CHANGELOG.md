@@ -4,6 +4,42 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0]
+
+### Fixed
+
+- **Reset times were wrong.** The weekly window was anchored on first observed usage,
+  but the weekly cycle is tied to the account, so the app reported a date it had no
+  basis for — for a fresh account with no reset in its history it invented one outright.
+  The anchor is now an actually observed reset, or a value you supply; with neither, the
+  app says so instead of guessing.
+- The 5-hour window is now given as a provable upper bound ("resets by 18:42") rather
+  than a precise-looking time. The file stores whole-percent values every ~15 minutes and
+  a small first request rounds to 0%, so the exact start of a window is not recoverable.
+- Durations no longer read "resets in in 1 hr" in languages whose relative-time format
+  supplies its own preposition; they are now formatted as plain units.
+- The action buttons in the Limits view were rendered without their click handlers.
+
+### Added
+
+- **Weekly reset calibration.** Enter the time Claude's own usage view shows — the whole
+  string such as "Resets Wed 7:00 AM" is understood — and reset times become exact. The
+  anchor is also learned automatically the first time a reset is observed, and persists
+  even if the sample history is later trimmed.
+- **Live usage via Anthropic's usage endpoint**, off by default and asked about once at
+  first run. Reads the OAuth token Claude Code stores locally, or one entered by hand,
+  and reports exact figures and reset times. Limited to the active profile unless
+  explicitly widened to all profiles, which the setting warns about. Manually entered
+  tokens are encrypted at rest with Electron `safeStorage`.
+- Consent version raised to 2, so the notice is shown again: the app can now make
+  network requests, which the previous text ruled out.
+
+### Changed
+
+- README, SECURITY.md and DISCLAIMER.md rewritten around the optional network feature;
+  the blanket "no network requests" claim is gone and replaced with a precise account of
+  what is sent, when, and where.
+
 ## [1.2.0]
 
 ### Added

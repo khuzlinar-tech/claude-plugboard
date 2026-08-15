@@ -3,7 +3,19 @@
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-const S = { tab: 'general', cfg: null, info: null, claude: null, state: null, langs: [] };
+const S = { tab: 'general', cfg: null, info: null, claude: null, state: null, langs: [], tokens: [] };
+
+/** Per-profile token availability, for the live-usage section. */
+async function loadTokens() {
+  S.cfg = await window.api.config.get();
+  S.state = await window.api.getState();
+  S.tokens = await Promise.all(
+    S.state.profiles.map(async (p) => {
+      const st = await window.api.apiTokenState(p.slot);
+      return Object.assign({ slot: p.slot, label: p.label || p.slot }, st);
+    })
+  );
+}
 
 let DICT = {};
 let LOCALE = 'en-US';
@@ -180,7 +192,45 @@ function renderClaude(pane) {
     )
     .join('');
 
+  const apiModes = ['off', 'active', 'all']
+    .map(
+      (v) => `<label class="row row-pick">
+        <div class="row-text">
+          <div class="row-t">${esc(t(`apiMode.${v}`))}</div>
+          ${v === 'all' ? `<div class="row-h" style="color:var(--warn)">${esc(t('set.apiAllWarning'))}</div>` : ''}
+        </div>
+        <input type="radio" name="apiMode" value="${esc(v)}" ${S.cfg.apiMode === v ? 'checked' : ''}>
+      </label>`
+    )
+    .join('');
+
+  const tokenRows = (S.tokens || [])
+    .map(
+      (x) => `<div class="row">
+        <div class="row-text">
+          <div class="row-t">${esc(x.label)}</div>
+          <div class="row-h">${esc(
+            x.hasManual ? t('set.apiTokenSet') : x.hasCode ? (x.codeExpired ? t('err.API_TOKEN_EXPIRED') : t('set.apiTokenSet')) : t('set.apiTokenNone')
+          )}</div>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-sm" data-token-set="${esc(x.slot)}">${esc(t('set.apiTokenEnter'))}</button>
+          ${x.hasManual ? `<button class="btn btn-sm btn-ghost" data-token-clear="${esc(x.slot)}">${esc(t('set.apiTokenClear'))}</button>` : ''}
+        </div>
+      </div>`
+    )
+    .join('');
+
   pane.innerHTML =
+    section(
+      t('set.liveUsage'),
+      apiModes +
+        `<div class="row-h" style="margin-top:10px">${esc(t('set.apiModeHint'))}</div>` +
+        (S.cfg.apiMode !== 'off'
+          ? `<div style="margin-top:14px"><div class="row-t" style="margin-bottom:4px">${esc(t('set.apiToken'))}</div>${tokenRows}
+             <div class="row-h" style="margin-top:8px"><b>${esc(t('set.apiTokenHelpTitle'))}.</b> ${esc(t('set.apiTokenHelp'))}</div></div>`
+          : '')
+    ) +
     section(
       t('set.scope'),
       scopes +
@@ -189,6 +239,10 @@ function renderClaude(pane) {
            ${c.cli && c.cli.present ? esc(t('set.cliDetected')) : esc(t('set.cliMissing'))}
            <span class="mono">${esc((c.cli && c.cli.dir) || '')}</span>
          </div>`
+    ) +
+    section(
+      t('set.calibration'),
+      `<div class="row"><div class="row-text"><div class="row-h">${esc(t('set.calibrationHint'))}</div></div></div>`
     ) +
     section(t('set.claudeApp'), installs) +
     `<div class="card">
@@ -315,6 +369,41 @@ function wire(pane) {
     })
   );
 
+  $$('input[name="apiMode"]', pane).forEach((el) =>
+    el.addEventListener('change', async () => {
+      S.cfg = await window.api.config.set({ apiMode: el.value, apiPrompted: true });
+      await loadTokens();
+      render();
+      toast(t('toast.saved'), 'ok');
+    })
+  );
+
+  $$('[data-token-set]', pane).forEach((el) =>
+    el.addEventListener('click', async () => {
+      const token = await ui.prompt({
+        title: t('dlg.tokenTitle'),
+        message: t('set.apiTokenHelp'),
+        value: '',
+        confirmText: t('common.save'),
+        cancelText: t('common.cancel'),
+      });
+      if (token === null || !token.trim()) return;
+      await window.api.setApiToken(el.dataset.tokenSet, token.trim());
+      await loadTokens();
+      render();
+      toast(t('toast.saved'), 'ok');
+    })
+  );
+
+  $$('[data-token-clear]', pane).forEach((el) =>
+    el.addEventListener('click', async () => {
+      await window.api.setApiToken(el.dataset.tokenClear, null);
+      await loadTokens();
+      render();
+      toast(t('toast.saved'), 'ok');
+    })
+  );
+
   $$('[data-act]', pane).forEach((el) =>
     el.addEventListener('click', async () => {
       switch (el.dataset.act) {
@@ -377,6 +466,7 @@ async function init() {
     window.api.getState(),
     window.api.languages(),
   ]);
+  await loadTokens();
 
   $('#winClose').addEventListener('click', () => window.api.win.close());
   $$('.tab').forEach((tb) =>

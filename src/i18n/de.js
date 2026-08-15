@@ -81,10 +81,10 @@ module.exports = {
   'lim.title': 'Limits',
   'lim.fh': '5-Stunden-Fenster',
   'lim.sd': 'Wochenlimit',
-  'lim.resetIn': 'Reset in {dur} · {time}',
+  'lim.resetBefore': 'Reset spätestens {time} — innerhalb von {dur}',
   'lim.notStarted': 'Fenster nicht begonnen',
-  'lim.resetAt': 'Reset {when}',
-  'lim.noReset': 'Reset-Zeitpunkt unbekannt',
+  'lim.resetBeforeAt': 'Reset spätestens {when}',
+  'lim.resetUnknown': 'noch kein Reset beobachtet — die genaue Zeit zeigt Claude selbst',
   'lim.history': 'Verbrauchsverlauf',
   'lim.samplesInfo': 'Messwerte: {n} · erster {from} · letzter {to}.',
   'lim.gaps': 'Lücken in der Linie sind Zeiten, in denen Claude geschlossen war und nichts aufgezeichnet wurde.',
@@ -94,7 +94,7 @@ module.exports = {
   'lim.noOrgData':
     'Für das Konto dieses Profils gibt es noch keine Messwerte. Sie entstehen, während Claude Desktop unter diesem Konto läuft.',
   'lim.source':
-    'Die Prozentwerte stammen aus plan-usage-history.json — dieselben Zahlen, die Claude selbst anzeigt. Der Reset-Zeitpunkt wird aus dem letzten Zählerreset abgeleitet und ist daher eine Schätzung, kein offizielles Datum.',
+    'Die Prozentwerte stammen aus plan-usage-history.json — dieselben Zahlen, die Claude selbst anzeigt. Die Reset-Zeiten sind aus diesen Messwerten abgeleitete Obergrenzen: die Datei enthält alle ~15 Minuten gerundete Werte, der genaue Beginn eines Fensters lässt sich daraus nicht rekonstruieren. Die genauen Zeiten zeigt Claude selbst.',
   'lim.col.profile': 'Profil',
   'lim.col.plan': 'Tarif',
   'lim.col.sample': 'Messwert',
@@ -299,7 +299,7 @@ module.exports = {
     'Dieses Projekt steht in keiner Verbindung zu Anthropic und wird von Anthropic weder unterstützt noch gebilligt. „Claude“ ist eine Marke von Anthropic und wird hier nur genannt, um zu beschreiben, womit das Werkzeug arbeitet. Melden Sie Probleme, die durch dieses Werkzeug entstehen, nicht dem Anthropic-Support.',
   'consent.local.h': 'Alles bleibt auf diesem Computer',
   'consent.local.b':
-    'Die App verschiebt Dateien, die Claude Desktop und Claude Code bereits auf diesem Rechner geschrieben haben, zwischen Ordnern desselben Rechners. Sie hat keine Netzwerkaufrufe, keine Telemetrie und keine eigenen Konten.',
+    'Die App verschiebt Dateien, die Claude Desktop und Claude Code bereits auf diesem Rechner geschrieben haben, zwischen Ordnern desselben Rechners. Sie hat keine Telemetrie und keine eigenen Konten. Eine optionale Funktion, die aus ist, bis Sie sie einschalten, fragt den Usage-Endpunkt von Anthropic nach den genauen Zahlen und nutzt dafür den Token, den Claude Code hier bereits gespeichert hat: Dieser Token geht nur an api.anthropic.com, nur im Anfrage-Header, wird nie protokolliert und nirgendwo sonst hingeschickt. Sonst geht nichts ins Netz.',
   'consent.ai.h': 'Mit KI-Unterstützung geschrieben',
   'consent.ai.b':
     'Diese Anwendung wurde weitgehend von einem KI-Assistenten geschrieben und von einem Menschen geprüft. Behandeln Sie sie wie jeden anderen Fremdcode: Lesen Sie den Quellcode, bevor Sie ihr Wichtiges anvertrauen.',
@@ -309,6 +309,51 @@ module.exports = {
   'consent.accept': 'Ich habe das Obenstehende gelesen und akzeptiere es',
   'consent.agree': 'Weiter',
   'consent.decline': 'Beenden',
+
+  'lim.resetExact': 'Reset {when}',
+  'lim.resetExactIn': 'Reset {when} — in {dur}',
+  'lim.sourceApi': 'exakt, aus Claudes Usage-API',
+  'lim.calibrate': 'Genauen Wochen-Reset angeben',
+  'lim.calibrated': 'Wochen-Reset kalibriert',
+  'lim.calibrateBad': 'Bitte Wochentag und Uhrzeit angeben, zum Beispiel „{example}“.',
+  'lim.viaApi': 'aus der API',
+
+  'err.API_NO_TOKEN': 'Für dieses Profil gibt es keinen Claude-Code-Token. Bitte unten manuell eintragen.',
+  'err.API_TOKEN_EXPIRED': 'Der Claude-Code-Token ist abgelaufen. Öffnen Sie Claude Code einmal, damit er erneuert wird, oder tragen Sie einen neuen ein.',
+  'err.API_UNAUTHORIZED': 'Die API hat den Token abgelehnt (nicht autorisiert). Er ist womöglich falsch oder abgelaufen.',
+  'err.API_HTTP': 'Die Usage-API meldete einen Fehler (HTTP {status}).',
+  'err.API_TIMEOUT': 'Die Usage-API hat nicht rechtzeitig geantwortet.',
+  'err.API_NETWORK': 'Die Usage-API war nicht erreichbar: {detail}',
+
+  'set.liveUsage': 'Exakte Limits (über API)',
+  'set.apiMode': 'Exakte Werte aus Claudes API lesen',
+  'apiMode.off': 'Aus — nur lokale Dateien',
+  'apiMode.active': 'Nur aktives Profil',
+  'apiMode.all': 'Alle Profile',
+  'set.apiModeHint':
+    'Wenn aktiv, liest die App den OAuth-Token, den Claude Code auf diesem Rechner abgelegt hat, und fragt beim Usage-Endpunkt von Anthropic die genauen Werte und Reset-Zeiten ab. Der Token geht ausschließlich an api.anthropic.com, nur im Anfrage-Header, und wird weder gespeichert noch protokolliert. Dies ist die einzige Funktion, die überhaupt ins Netz geht.',
+  'set.apiAllWarning':
+    'Mehrere Konten von einem Rechner und einer IP abzufragen ist genau das Muster, das nach Mehrkonten-Automatisierung aussieht. Das Risiko trifft Ihre Konten, nicht diese App. Nur einschalten, wenn Sie das in Kauf nehmen.',
+  'set.apiToken': 'Token manuell',
+  'set.apiTokenSet': 'Für dieses Profil ist ein Token gespeichert',
+  'set.apiTokenNone': 'kein Token vorhanden',
+  'set.apiTokenEnter': 'Token eingeben…',
+  'set.apiTokenClear': 'Token entfernen',
+  'set.apiTokenHelpTitle': 'Woher der Token kommt',
+  'set.apiTokenHelp':
+    'Der Token ist der Wert von „accessToken“ in der Datei .credentials.json in Ihrem .claude-Ordner; sie entsteht nach der Anmeldung bei Claude Code. Datei öffnen, die lange accessToken-Zeichenkette kopieren und hier einfügen. Auf diesem Rechner wird sie verschlüsselt abgelegt.',
+  'set.calibration': 'Zeitpunkt des Wochen-Resets',
+  'set.calibrationHint':
+    'Aus der Datei auf der Festplatte lässt sich der genaue Wochen-Reset nicht ableiten. Tragen Sie die Zeit ein, die Claudes eigene Nutzungsansicht zeigt (etwa „Mittwoch 07:00“), dann stimmt sie ab sofort. Wird automatisch gelernt, sobald ein Reset beobachtet wurde.',
+
+  'apiPrompt.title': 'Exakte Werte anzeigen?',
+  'apiPrompt.body':
+    'Standardmäßig liest die App nur lokale Dateien, weshalb Reset-Zeiten Schätzungen sind. Auf Wunsch kann sie den Usage-Endpunkt von Anthropic nach den genauen Zahlen fragen und dafür den Token nutzen, den Claude Code hier bereits gespeichert hat — die einzige Funktion mit Netzwerkzugriff. Standardmäßig aus; jederzeit in den Einstellungen änderbar.',
+  'apiPrompt.enable': 'Für das aktive Profil einschalten',
+  'apiPrompt.later': 'Jetzt nicht',
+
+  'dlg.tokenTitle': 'Token manuell',
+  'dlg.tokenHint': 'Fügen Sie den accessToken aus .credentials.json ein (wo er zu finden ist, steht in den Einstellungen).',
 
   'platform.title': 'Nur Windows',
   'platform.body':

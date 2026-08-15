@@ -6,7 +6,12 @@ contextBridge.exposeInMainWorld('api', {
   getState: () => ipcRenderer.invoke('app:state'),
   getInfo: () => ipcRenderer.invoke('app:info'),
   planUsage: () => ipcRenderer.invoke('usage:plan'),
+  apiUsage: (force) => ipcRenderer.invoke('usage:api', { force }),
   cliUsage: () => ipcRenderer.invoke('usage:cli'),
+
+  apiTokenState: (slot) => ipcRenderer.invoke('api:tokenState', slot),
+  setApiToken: (slot, token) => ipcRenderer.invoke('api:setToken', { slot, token }),
+  calibrateWeekly: (orgUuid, epochMs) => ipcRenderer.invoke('api:calibrate', { orgUuid, epochMs }),
 
   dict: () => ipcRenderer.invoke('i18n:dict'),
   languages: () => ipcRenderer.invoke('i18n:list'),
@@ -49,6 +54,7 @@ contextBridge.exposeInMainWorld('api', {
   onThemeChanged: (cb) => ipcRenderer.on('theme:changed', (_e, data) => cb(data)),
   onNavigate: (cb) => ipcRenderer.on('nav:tab', (_e, tab) => cb(tab)),
   onSwitchRequest: (cb) => ipcRenderer.on('ui:switchRequest', (_e, slot) => cb(slot)),
+  onApiPrompt: (cb) => ipcRenderer.on('ui:apiPrompt', () => cb()),
   onCliProgress: (cb) => ipcRenderer.on('usage:cliProgress', (_e, data) => cb(data)),
 
   win: {

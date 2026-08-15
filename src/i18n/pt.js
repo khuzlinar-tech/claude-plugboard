@@ -81,10 +81,10 @@ module.exports = {
   'lim.title': 'Limites',
   'lim.fh': 'Janela de 5 horas',
   'lim.sd': 'Limite semanal',
-  'lim.resetIn': 'reinicia em {dur} · {time}',
+  'lim.resetBefore': 'reinicia até {time} — dentro de {dur}',
   'lim.notStarted': 'janela não iniciada',
-  'lim.resetAt': 'reinicia {when}',
-  'lim.noReset': 'horário de reinício desconhecido',
+  'lim.resetBeforeAt': 'reinicia até {when}',
+  'lim.resetUnknown': 'nenhum reinício observado ainda — o horário exato está no próprio Claude',
   'lim.history': 'Histórico de consumo',
   'lim.samplesInfo': 'Medições: {n} · primeira {from} · última {to}.',
   'lim.gaps': 'As falhas na linha são períodos em que o Claude estava fechado e nada foi registrado.',
@@ -94,7 +94,7 @@ module.exports = {
   'lim.noOrgData':
     'Ainda não há medições para a conta deste perfil. Elas aparecem enquanto o Claude Desktop roda com essa conta.',
   'lim.source':
-    'As porcentagens vêm de plan-usage-history.json — os mesmos números que o próprio Claude mostra. O horário de reinício é deduzido do último zeramento do contador, portanto é uma estimativa, não uma data oficial.',
+    'As porcentagens vêm de plan-usage-history.json — os mesmos números que o próprio Claude mostra. Os horários de reinício são limites superiores deduzidos dessas medições: o arquivo guarda valores arredondados a cada ~15 minutos, então o momento exato em que a janela abriu não pode ser recuperado. Os horários exatos estão no próprio Claude.',
   'lim.col.profile': 'Perfil',
   'lim.col.plan': 'Plano',
   'lim.col.sample': 'Medição',
@@ -298,7 +298,7 @@ module.exports = {
     'Este projeto não é afiliado à Anthropic nem é endossado ou mantido por ela. “Claude” é marca da Anthropic, citada aqui apenas para descrever com o que a ferramenta funciona. Não relate ao suporte da Anthropic problemas causados por esta ferramenta.',
   'consent.local.h': 'Tudo permanece neste computador',
   'consent.local.b':
-    'O aplicativo move, entre pastas desta máquina, arquivos que o Claude Desktop e o Claude Code já gravaram nela. Não faz chamadas de rede, não tem telemetria nem contas próprias.',
+    'O aplicativo move, entre pastas desta máquina, arquivos que o Claude Desktop e o Claude Code já gravaram nela. Não tem telemetria nem contas próprias. Um recurso opcional, desligado até você ativá-lo, consulta o endpoint de uso da Anthropic para obter os números exatos usando o token que o Claude Code já guardou aqui: esse token vai apenas para api.anthropic.com, apenas no cabeçalho da requisição, nunca é registrado nem enviado a mais ninguém. Nada além disso toca a rede.',
   'consent.ai.h': 'Escrito com ajuda de IA',
   'consent.ai.b':
     'Este aplicativo foi escrito em grande parte por um assistente de IA e revisado por uma pessoa. Trate-o como qualquer código de terceiros: leia o código-fonte antes de confiar nele para algo importante.',
@@ -308,6 +308,51 @@ module.exports = {
   'consent.accept': 'Li e aceito o texto acima',
   'consent.agree': 'Continuar',
   'consent.decline': 'Sair',
+
+  'lim.resetExact': 'reinicia {when}',
+  'lim.resetExactIn': 'reinicia {when} — em {dur}',
+  'lim.sourceApi': 'exato, da API de uso do Claude',
+  'lim.calibrate': 'Definir o reinício semanal exato',
+  'lim.calibrated': 'Reinício semanal calibrado',
+  'lim.calibrateBad': 'Informe um dia da semana e um horário, por exemplo “{example}”.',
+  'lim.viaApi': 'da API',
+
+  'err.API_NO_TOKEN': 'Este perfil não tem token do Claude Code. Informe um manualmente abaixo.',
+  'err.API_TOKEN_EXPIRED': 'O token do Claude Code expirou. Abra o Claude Code uma vez para renová-lo, ou informe um novo.',
+  'err.API_UNAUTHORIZED': 'A API rejeitou o token (não autorizado). Ele pode estar errado ou expirado.',
+  'err.API_HTTP': 'A API de uso retornou um erro (HTTP {status}).',
+  'err.API_TIMEOUT': 'A API de uso não respondeu a tempo.',
+  'err.API_NETWORK': 'Não foi possível alcançar a API de uso: {detail}',
+
+  'set.liveUsage': 'Limites exatos (via API)',
+  'set.apiMode': 'Ler números exatos da API do Claude',
+  'apiMode.off': 'Desligado — apenas arquivos locais',
+  'apiMode.active': 'Apenas o perfil ativo',
+  'apiMode.all': 'Todos os perfis',
+  'set.apiModeHint':
+    'Quando ligado, o aplicativo lê o token OAuth que o Claude Code guardou nesta máquina e pede ao endpoint de uso da Anthropic os números e horários de reinício exatos. O token vai apenas para api.anthropic.com, apenas no cabeçalho, e nunca é armazenado ou registrado. Este é o único recurso que usa a rede.',
+  'set.apiAllWarning':
+    'Consultar várias contas a partir de uma mesma máquina e IP é exatamente o padrão que parece automação multiconta. O risco recai sobre suas contas, não sobre este aplicativo. Ative apenas se aceitar isso.',
+  'set.apiToken': 'Token manual',
+  'set.apiTokenSet': 'há um token salvo para este perfil',
+  'set.apiTokenNone': 'sem token manual',
+  'set.apiTokenEnter': 'Informar token…',
+  'set.apiTokenClear': 'Remover token',
+  'set.apiTokenHelpTitle': 'Como obter o token',
+  'set.apiTokenHelp':
+    'O token é o valor de “accessToken” dentro do arquivo .credentials.json na sua pasta .claude, que aparece depois de entrar no Claude Code. Abra esse arquivo, copie a longa string accessToken e cole aqui. Ela fica criptografada nesta máquina.',
+  'set.calibration': 'Horário do reinício semanal',
+  'set.calibrationHint':
+    'O arquivo em disco não permite fixar o reinício semanal exato. Informe o horário que a própria tela de uso do Claude mostra (por exemplo “quarta 07:00”) e a partir daí ele será exato. Aprendido sozinho assim que um reinício for observado.',
+
+  'apiPrompt.title': 'Mostrar números exatos?',
+  'apiPrompt.body':
+    'Por padrão o aplicativo lê apenas arquivos locais, então os horários de reinício são estimativas. Opcionalmente ele pode pedir os números exatos ao endpoint de uso da Anthropic usando o token que o Claude Code já guardou aqui — o único recurso que usa a rede. Desligado por padrão; você pode mudar a qualquer momento nas Configurações.',
+  'apiPrompt.enable': 'Ligar para o perfil ativo',
+  'apiPrompt.later': 'Agora não',
+
+  'dlg.tokenTitle': 'Token manual',
+  'dlg.tokenHint': 'Cole o accessToken de .credentials.json (as Configurações explicam onde encontrá-lo).',
 
   'platform.title': 'Somente Windows',
   'platform.body':
