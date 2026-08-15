@@ -132,7 +132,14 @@ function render() {
       <span class="dot"></span>${esc(running ? t('claude.running', { n: data.claude.count }) : t('claude.stopped'))}
     </div>`;
 
-  body.innerHTML = status + account + usage + switcher;
+  const versions = (data.versions || []).length
+    ? `<div class="popup-sec">${esc(t('ver.title'))}</div>` +
+      data.versions
+        .map((v) => `<div class="popup-row"><span>${esc(v.label)}</span><b class="mono">${esc(v.version)}</b></div>`)
+        .join('')
+    : '';
+
+  body.innerHTML = status + account + usage + switcher + versions;
 
   $$('.popup-switch', body).forEach((el) =>
     el.addEventListener('click', async () => {

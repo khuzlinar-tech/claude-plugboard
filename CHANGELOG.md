@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0]
+
+### Added
+
+- **The tray icon can show usage.** Four styles — app icon, icon with a bar, plain
+  percentage, or a battery — tracking either the 5-hour or the weekly window, in
+  threshold colours or a single colour. Drawn at 16 and 32 pixels from raw pixel data,
+  so it stays sharp at any display scaling and still pulls in no image library.
+- **Installed Claude Code versions** in the tray panel: the build bundled with Claude
+  Desktop, the npm CLI, and the editor extensions, each read from disk.
+- **Extra notification thresholds.** Alongside the main one, a comma-separated list such
+  as `75, 95`. The highest threshold reached is announced, once per limit window, so
+  passing several at once does not produce a burst.
+
+### Changed
+
+- Everything system-specific now lives in `src/core/platform.js`; the rest of the core
+  has no platform coupling. The PNG and ICO writers moved to `src/core/png.js`, shared
+  between the build-time icon generator and the runtime tray icon.
+- macOS is explicitly out of scope: [Claude-Usage-Tracker](https://github.com/hamed-elfayome/Claude-Usage-Tracker)
+  already covers the Mac natively, and the README points there rather than shipping an
+  unverified second implementation. Its feature set is the reference this project
+  measures itself against.
+
 ## [1.4.0]
 
 ### Added

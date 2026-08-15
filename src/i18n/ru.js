@@ -248,6 +248,23 @@ module.exports = {
   'set.minimizeToTray': 'Кнопка «свернуть» прячет в трей',
   'set.trayHint': 'Если все опции трея выключены, закрытие окна завершает приложение.',
 
+  'ver.title': 'Claude Code',
+
+  'set.trayIcon': 'Значок в трее',
+  'set.trayStyle': 'Вид',
+  'trayStyle.icon': 'Иконка приложения',
+  'trayStyle.bar': 'Иконка с полосой',
+  'trayStyle.percent': 'Проценты',
+  'trayStyle.battery': 'Батарея',
+  'set.trayMetric': 'Показывает',
+  'trayMetric.fh': '5-часовое окно',
+  'trayMetric.sd': 'Недельный лимит',
+  'set.trayMono': 'Один цвет вместо зелёного/жёлтого/красного',
+  'set.trayHintIcon': 'Рисуется в 16 и 32 пикселя, поэтому остаётся чётким при любом масштабе экрана.',
+
+  'set.notifyExtra': 'Дополнительные пороги, %',
+  'set.notifyExtraHint': 'Через запятую, например 75, 95. Каждый срабатывает один раз на окно лимита.',
+
   'set.notifications': 'Уведомления',
   'set.notifyEnabled': 'Предупреждать о приближении к лимиту',
   'set.notifyThreshold': 'Порог, %',

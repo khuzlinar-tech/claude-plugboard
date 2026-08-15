@@ -16,7 +16,13 @@ const DEFAULTS = {
   minimizeToTray: false,
   notifications: true,
   notifyThreshold: 90,
+  notifyThresholdsExtra: [], // additional percentages, e.g. [75, 95]
   notifyOnReset: true,
+
+  // Tray icon: what it draws and which window it tracks.
+  trayStyle: 'icon', // icon | bar | percent | battery
+  trayMetric: 'fh', // fh (5-hour) | sd (weekly)
+  trayMono: false,
   launchAfterSwitch: true,
   pollIntervalSec: 4,
   switchScope: 'both', // both | desktop | code

@@ -133,10 +133,33 @@ function renderGeneral(pane) {
       toggle('closeToTray', t('set.closeToTray')) + toggle('minimizeToTray', t('set.minimizeToTray'), t('set.trayHint'))
     ) +
     section(
+      t('set.trayIcon'),
+      selectRow(
+        'trayStyle',
+        t('set.trayStyle'),
+        ['icon', 'bar', 'percent', 'battery'].map((v) => ({ value: v, label: t(`trayStyle.${v}`) }))
+      ) +
+        (S.cfg.trayStyle !== 'icon'
+          ? selectRow(
+              'trayMetric',
+              t('set.trayMetric'),
+              ['fh', 'sd'].map((v) => ({ value: v, label: t(`trayMetric.${v}`) }))
+            ) + toggle('trayMono', t('set.trayMono'), t('set.trayHintIcon'))
+          : '')
+    ) +
+    section(
       t('set.notifications'),
       toggle('notifications', t('set.notifyEnabled'), t('set.notifyHint')) +
         toggle('notifyOnReset', t('set.notifyReset')) +
-        numberRow('notifyThreshold', t('set.notifyThreshold'), 50, 100)
+        numberRow('notifyThreshold', t('set.notifyThreshold'), 50, 100) +
+        `<label class="row">
+          <div class="row-text">
+            <div class="row-t">${esc(t('set.notifyExtra'))}</div>
+            <div class="row-h">${esc(t('set.notifyExtraHint'))}</div>
+          </div>
+          <input class="input input-sel" data-cfg-list="notifyThresholdsExtra"
+                 value="${esc((S.cfg.notifyThresholdsExtra || []).join(', '))}" placeholder="75, 95">
+        </label>`
     ) +
     section(
       t('set.behaviour'),
@@ -371,6 +394,23 @@ function wire(pane) {
   $$('[data-cfg-sel]', pane).forEach((el) =>
     el.addEventListener('change', async () => {
       S.cfg = await window.api.config.set({ [el.dataset.cfgSel]: el.value });
+      // The tray style select reveals or hides its dependent options.
+      if (el.dataset.cfgSel === 'trayStyle') render();
+    })
+  );
+
+  // Comma-separated numbers, kept within 1..100 and de-duplicated.
+  $$('[data-cfg-list]', pane).forEach((el) =>
+    el.addEventListener('change', async () => {
+      const nums = [...new Set(
+        el.value
+          .split(/[,\s;]+/)
+          .map((s) => parseInt(s, 10))
+          .filter((n) => Number.isFinite(n) && n > 0 && n <= 100)
+      )].sort((a, b) => a - b);
+      el.value = nums.join(', ');
+      S.cfg = await window.api.config.set({ [el.dataset.cfgList]: nums });
+      toast(t('toast.saved'), 'ok');
     })
   );
 

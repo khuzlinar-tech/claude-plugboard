@@ -44,8 +44,9 @@ the cookies and the Claude Code credentials all come back exactly as you left th
 - **Rate limits** — current 5-hour and weekly usage, estimated reset time, history chart with
   gaps where Claude was closed, daily peaks, and a side-by-side comparison of every profile.
 - **Claude Code usage** — token totals from local transcripts, by day, model and project.
-- **Tray icon** — usage in the tooltip, quick profile switching, launch/close Claude,
-  notification and autostart toggles.
+- **Tray icon** — a panel with the active account, usage meters and one-click switching.
+  The icon itself can show the percentage as a bar, a number or a battery.
+- **Installed Claude Code versions** — desktop bundle, npm CLI and editor extensions.
 - **Notifications** — when a limit window crosses a threshold, and when it resets.
 - **Autostart** — optional launch at Windows sign-in, optionally straight to the tray.
 - **Dark, light and system theme.**

@@ -246,6 +246,23 @@ module.exports = {
   'set.minimizeToTray': 'Minimize button hides to tray',
   'set.trayHint': 'With every tray option off, closing the window quits the app.',
 
+  'ver.title': 'Claude Code',
+
+  'set.trayIcon': 'Tray icon',
+  'set.trayStyle': 'Style',
+  'trayStyle.icon': 'App icon',
+  'trayStyle.bar': 'Icon with bar',
+  'trayStyle.percent': 'Percentage',
+  'trayStyle.battery': 'Battery',
+  'set.trayMetric': 'Shows',
+  'trayMetric.fh': '5-hour window',
+  'trayMetric.sd': 'Weekly limit',
+  'set.trayMono': 'Single colour instead of green/amber/red',
+  'set.trayHintIcon': 'Drawn at 16 and 32 pixels, so it stays sharp at any display scaling.',
+
+  'set.notifyExtra': 'Extra thresholds, %',
+  'set.notifyExtraHint': 'Comma separated, for example 75, 95. Each fires once per limit window.',
+
   'set.notifications': 'Notifications',
   'set.notifyEnabled': 'Warn when approaching a limit',
   'set.notifyThreshold': 'Threshold, %',

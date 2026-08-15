@@ -24,6 +24,8 @@ const claudeApp = require('./core/claudeApp');
 const usage = require('./core/usage');
 const cliusage = require('./core/cliusage');
 const apiUsage = require('./core/apiUsage');
+const trayIcon = require('./core/trayIcon');
+const versions = require('./core/versions');
 const platformInfo = require('./core/platform');
 const i18n = require('./i18n');
 
@@ -414,6 +416,33 @@ function activeUsage(list) {
   return { active, u: u || null };
 }
 
+/**
+ * Repaints the tray icon for the current usage. The static mark is loaded from
+ * disk; the data-driven styles are drawn at 16 and 32 px so Windows has a crisp
+ * bitmap at both common DPI settings.
+ */
+function updateTrayIcon(pct) {
+  if (!tray) return;
+  const style = config.get('trayStyle');
+
+  if (style === 'icon' || pct == null) {
+    tray.setImage(nativeImage.createFromPath(path.join(ASSETS, 'tray.ico')));
+    return;
+  }
+
+  try {
+    const mono = !!config.get('trayMono');
+    const img = nativeImage.createFromBuffer(trayIcon.render({ style, pct, size: 16, mono }), { scaleFactor: 1 });
+    img.addRepresentation({
+      scaleFactor: 2,
+      buffer: trayIcon.render({ style, pct, size: 32, mono }),
+    });
+    tray.setImage(img);
+  } catch {
+    tray.setImage(nativeImage.createFromPath(path.join(ASSETS, 'tray.ico')));
+  }
+}
+
 function buildTray() {
   if (!tray) {
     tray = new Tray(nativeImage.createFromPath(path.join(ASSETS, 'tray.ico')));
@@ -488,6 +517,7 @@ function buildTray() {
       : t('tray.tooltipIdle')
   );
   tray.setContextMenu(menu);
+  updateTrayIcon(u ? u.latest[config.get('trayMetric') === 'sd' ? 'sd' : 'fh'] : null);
 }
 
 /** Hands the switch to the main window so the confirmation matches the app's own style. */
@@ -564,7 +594,12 @@ function notify(title, body) {
 function checkLimits() {
   if (!config.get('notifications')) return;
 
-  const threshold = Number(config.get('notifyThreshold')) || 90;
+  // All configured thresholds, highest first: crossing 95 should announce 95,
+  // not the 75 it also passed.
+  const thresholds = [Number(config.get('notifyThreshold')) || 90]
+    .concat((config.get('notifyThresholdsExtra') || []).map(Number))
+    .filter((n) => Number.isFinite(n) && n > 0 && n <= 100)
+    .sort((a, b) => b - a);
   const wantReset = !!config.get('notifyOnReset');
 
   let list = [];
@@ -599,16 +634,20 @@ function checkLimits() {
         );
       }
 
-      let notifiedFor = prev ? prev.notifiedFor : null;
-      if (!u.stale && value >= threshold && window && notifiedFor !== window) {
+      // Announce the highest threshold reached, once per threshold per window.
+      const reached = thresholds.find((th) => value >= th) || null;
+      const seen = prev && prev.window === window ? prev.seen || [] : [];
+      let notifiedSeen = seen;
+
+      if (!u.stale && reached != null && window && !seen.includes(reached)) {
         notify(
-          t('notif.limitTitle', { pct: value }),
+          t('notif.limitTitle', { pct: reached }),
           t('notif.limitBody', { slot: name, window: t(`notif.window.${key}`), pct: value })
         );
-        notifiedFor = window;
+        notifiedSeen = seen.concat(reached);
       }
 
-      limitState[org][key] = { value, notifiedFor };
+      limitState[org][key] = { value, window, seen: notifiedSeen };
     }
   }
 }
@@ -761,6 +800,7 @@ app.whenReady().then(() => {
     if (changed.includes('autoStart')) applyAutoStart(config.get('autoStart'));
     if (changed.includes('pollIntervalSec')) startPolling();
     if (changed.includes('notifications')) buildTray();
+    if (changed.some((k) => k === 'trayStyle' || k === 'trayMetric' || k === 'trayMono')) buildTray();
     if (changed.includes('apiMode')) apiCache.clear();
     broadcast('config:changed', config.all());
   });
@@ -950,6 +990,7 @@ ipcMain.handle('popup:data', async () => {
     orgs: masked.ok ? masked.orgs : {},
     api: Object.fromEntries([...apiCache.entries()].map(([k, v]) => [k, v.result])),
     apiMode: config.get('apiMode'),
+    versions: versions.detect(),
   };
 });
 
